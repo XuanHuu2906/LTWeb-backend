@@ -19,21 +19,20 @@ app.get('/api/health', (_req, res) => {
   res.json({ success: true, message: 'Server is running' });
 });
 
-// ── Routes will be mounted here ──────────────────────────────────────────────
-// app.use('/api/auth', authRoutes);
-// app.use('/api/users', userRoutes);
-// app.use('/api/jobs', jobRoutes);
-// app.use('/api/cvs', cvRoutes);
-// app.use('/api/applications', applicationRoutes);
-// app.use('/api/notifications', notificationRoutes);
-// app.use('/api/chat', chatRoutes);
+// ── Routes ───────────────────────────────────────────────────────────────────
+import authRoutes from './routes/auth/auth.routes';
+import userAdminRoutes from './routes/users/admin.routes';
+import notificationRoutes from './routes/notifications/notification.routes';
+import templateRoutes from './routes/cvs/template.routes';
+import jobAdminRoutes from './routes/jobs/admin.routes';
+
+app.use('/api/auth', authRoutes);
+app.use('/api/users', userAdminRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/cvs/templates', templateRoutes);
+app.use('/api/jobs/admin', jobAdminRoutes);
 
 // ── Error handler ────────────────────────────────────────────────────────────
 app.use(errorHandler);
-
-// ── Start server ─────────────────────────────────────────────────────────────
-app.listen(env.port, () => {
-  console.log(`Server running on http://localhost:${env.port} (${env.nodeEnv})`);
-});
 
 export default app;

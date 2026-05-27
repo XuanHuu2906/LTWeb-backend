@@ -17,6 +17,8 @@ export const env = {
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
   },
+  smtpFrom: process.env.SMTP_FROM || 'noreply@timviec.vn',
+  clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   upload: {
     dir: process.env.UPLOAD_DIR || 'uploads',
