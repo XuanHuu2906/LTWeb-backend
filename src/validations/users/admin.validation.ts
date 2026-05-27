@@ -1,11 +1,17 @@
-import { ValidationSchema } from '../../middleware/validate';
+import { z } from 'zod';
 
-export const adminUpdateUserSchema: ValidationSchema = {
-  email: { type: 'email', required: false },
-  role: { type: 'string', required: false, enum: ['candidate', 'recruiter'] },
-  status: { type: 'string', required: false, enum: ['active', 'banned'] },
-};
+export const adminUpdateUserSchema = z.object({
+  email: z.string().email('phải là email hợp lệ').optional().nullable(),
+  role: z.enum(['candidate', 'recruiter'], {
+    message: 'chỉ được phép là candidate hoặc recruiter',
+  }).optional().nullable(),
+  status: z.enum(['active', 'banned'], {
+    message: 'chỉ được phép là active hoặc banned',
+  }).optional().nullable(),
+});
 
-export const statusSchema: ValidationSchema = {
-  status: { type: 'string', required: true, enum: ['active', 'banned'] },
-};
+export const statusSchema = z.object({
+  status: z.enum(['active', 'banned'], {
+    message: 'chỉ được phép là active hoặc banned',
+  }),
+});

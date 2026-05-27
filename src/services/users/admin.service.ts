@@ -2,8 +2,20 @@ import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { PaginationParams } from '../../common/paginate';
 
+export interface UserFilters {
+  role?: string;
+  status?: string;
+  search?: string;
+}
+
+export interface UserUpdateInput {
+  email?: string;
+  status?: string;
+  role?: string;
+}
+
 export const userAdminService = {
-  async findAll(filters: any, pagination: PaginationParams) {
+  async findAll(filters: UserFilters, pagination: PaginationParams) {
     const where: any = { role: { not: 'admin' }, deletedAt: null };
     
     if (filters.role) where.role = filters.role;
@@ -60,7 +72,7 @@ export const userAdminService = {
     return userWithoutPassword;
   },
 
-  async update(id: number, data: any) {
+  async update(id: number, data: UserUpdateInput, adminId: number) {
     const user = await prisma.user.findUnique({
       where: { id },
       include: { candidateProfile: true, recruiterProfile: true }
@@ -90,40 +102,76 @@ export const userAdminService = {
         });
       }
 
+      // Ghi log kiểm toán hành động
+      await tx.auditLog.create({
+        data: {
+          adminId,
+          action: 'update_user',
+          targetType: 'user',
+          targetId: id,
+          details: JSON.stringify(data),
+        },
+      });
+
       const { passwordHash, ...rest } = updatedUser;
       return rest;
     });
   },
 
-  async toggleStatus(id: number, status: string) {
+  async toggleStatus(id: number, status: string, adminId: number) {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) throw new AppError(404, 'Không tìm thấy người dùng');
     if (user.role === 'admin') throw new AppError(403, 'Không thể khóa admin');
 
-    const result = await prisma.user.update({
-      where: { id },
-      data: { status },
-    });
-
-    if (status === 'banned') {
-      await prisma.refreshToken.updateMany({
-        where: { userId: id, revokedAt: null },
-        data: { revokedAt: new Date() },
+    return await prisma.$transaction(async (tx) => {
+      const result = await tx.user.update({
+        where: { id },
+        data: { status },
       });
-    }
 
-    const { passwordHash, ...rest } = result;
-    return rest;
+      if (status === 'banned') {
+        await tx.refreshToken.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+
+      // Ghi log kiểm toán
+      await tx.auditLog.create({
+        data: {
+          adminId,
+          action: 'toggle_user_status',
+          targetType: 'user',
+          targetId: id,
+          details: JSON.stringify({ status }),
+        },
+      });
+
+      const { passwordHash, ...rest } = result;
+      return rest;
+    });
   },
 
-  async softDelete(id: number) {
+  async softDelete(id: number, adminId: number) {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) throw new AppError(404, 'Không tìm thấy người dùng');
     if (user.role === 'admin') throw new AppError(403, 'Không thể xóa admin');
 
-    await prisma.user.update({
-      where: { id },
-      data: { deletedAt: new Date() },
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id },
+        data: { deletedAt: new Date() },
+      });
+
+      // Ghi log kiểm toán
+      await tx.auditLog.create({
+        data: {
+          adminId,
+          action: 'delete_user',
+          targetType: 'user',
+          targetId: id,
+        },
+      });
     });
   },
 };

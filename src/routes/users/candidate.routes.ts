@@ -7,7 +7,7 @@ import {
 import { authenticate } from '../../middleware/auth';
 import { upload } from '../../middleware/upload';
 import { validate } from '../../middleware/validate';
-import { updateCandidateProfileSchema } from '../../validations/users/candidate.validation';
+import { updateCandidateProfileSchema } from '../../validations/users/profile.validation';
 
 const router = Router();
 

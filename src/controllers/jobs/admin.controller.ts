@@ -20,6 +20,6 @@ export const getAllJobs = async (req: Request, res: Response) => {
 export const forceDeleteJob = async (req: Request, res: Response) => {
   const id = parseInt(req.params.id as string, 10);
   if (isNaN(id)) throw new AppError(400, 'ID không hợp lệ');
-  await adminService.softDelete(id);
+  await adminService.softDelete(id, req.user!.id);
   res.json(messageResponse('Xóa job thành công'));
 };

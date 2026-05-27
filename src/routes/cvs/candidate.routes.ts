@@ -15,7 +15,7 @@ import {
   createCVSchema,
   updateCVSchema,
   updateCVStatusSchema,
-} from '../../validations/cvs/candidate.validation';
+} from '../../validations/cvs/cv.validation';
 
 const router = Router();
 

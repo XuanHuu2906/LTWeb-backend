@@ -6,7 +6,7 @@ import {
 } from '../../controllers/applications/candidate.controller';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
-import { applySchema } from '../../validations/applications/candidate.validation';
+import { applySchema } from '../../validations/applications/application.validation';
 
 const router = Router();
 

@@ -5,13 +5,27 @@ import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { env } from '../../config/env';
 import { UserRole, UserStatus } from '../../types/enums';
+import { parseDuration } from '../../utils/time';
+
+export interface RegisterCandidateInput {
+  email: string;
+  password: string;
+  fullName: string;
+}
+
+export interface RegisterRecruiterInput {
+  email: string;
+  password: string;
+  companyName: string;
+  contactName?: string;
+}
 
 // Optional: define types if not fully defined in enums, but strings are fine as per Prisma schema.
 // For example, role: 'candidate' | 'recruiter' | 'admin'
 // status: 'active' | 'inactive' | 'banned'
 
 export const authService = {
-  async registerCandidate(data: any) {
+  async registerCandidate(data: RegisterCandidateInput) {
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
     if (existingUser) {
@@ -48,7 +62,7 @@ export const authService = {
     return user;
   },
 
-  async registerRecruiter(data: any) {
+  async registerRecruiter(data: RegisterRecruiterInput) {
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({ where: { email: data.email } });
     if (existingUser) {
@@ -117,7 +131,7 @@ export const authService = {
       data: {
         userId: user.id,
         tokenHash,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+        expiresAt: new Date(Date.now() + parseDuration(env.jwtRefreshExpiresIn))
       },
     });
 
@@ -184,7 +198,7 @@ export const authService = {
         data: {
           userId: user.id,
           tokenHash: newTokenHash,
-          expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          expiresAt: new Date(Date.now() + parseDuration(env.jwtRefreshExpiresIn))
         },
       })
     ]);

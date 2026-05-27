@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as notificationService from '../../services/notifications/notification.service';
 import { successResponse, paginatedResponse, messageResponse } from '../../common/response';
 import { getPagination } from '../../common/paginate';
+import { AppError } from '../../middleware/errorHandler';
 
 export const getNotifications = async (req: Request, res: Response) => {
   const userId = req.user!.id;
@@ -16,6 +17,7 @@ export const getNotifications = async (req: Request, res: Response) => {
 export const markAsRead = async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const id = parseInt(req.params.id as string, 10);
+  if (isNaN(id)) throw new AppError(400, 'ID thông báo không hợp lệ');
   await notificationService.markAsRead(userId, id);
   res.json(messageResponse('Đã đánh dấu đã đọc'));
 };

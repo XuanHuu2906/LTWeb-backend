@@ -1,40 +1,57 @@
-import { ValidationSchema } from '../../middleware/validate';
+import { z } from 'zod';
 
-export const registerCandidateSchema: ValidationSchema = {
-  email: { type: 'email', required: true },
-  password: { type: 'string', required: true, minLength: 6, maxLength: 100 },
-  confirmPassword: { type: 'string', required: true, matchField: 'password' },
-  fullName: { type: 'string', required: true, maxLength: 100 },
-};
+export const registerCandidateSchema = z.object({
+  email: z.string({ message: 'là bắt buộc' }).email('phải là email hợp lệ'),
+  password: z.string({ message: 'là bắt buộc' })
+    .min(6, 'phải có ít nhất 6 ký tự')
+    .max(100, 'không được vượt quá 100 ký tự'),
+  confirmPassword: z.string({ message: 'là bắt buộc' }),
+  fullName: z.string({ message: 'là bắt buộc' })
+    .min(1, 'là bắt buộc')
+    .max(100, 'không được vượt quá 100 ký tự'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Xác nhận mật khẩu phải trùng khớp với mật khẩu',
+  path: ['confirmPassword'],
+});
 
-export const registerRecruiterSchema: ValidationSchema = {
-  email: { type: 'email', required: true },
-  password: { type: 'string', required: true, minLength: 6, maxLength: 100 },
-  confirmPassword: { type: 'string', required: true, matchField: 'password' },
-  companyName: { type: 'string', required: true, maxLength: 200 },
-  contactName: { type: 'string', required: false, maxLength: 100 },
-};
+export const registerRecruiterSchema = z.object({
+  email: z.string({ message: 'là bắt buộc' }).email('phải là email hợp lệ'),
+  password: z.string({ message: 'là bắt buộc' })
+    .min(6, 'phải có ít nhất 6 ký tự')
+    .max(100, 'không được vượt quá 100 ký tự'),
+  confirmPassword: z.string({ message: 'là bắt buộc' }),
+  companyName: z.string({ message: 'là bắt buộc' })
+    .min(1, 'là bắt buộc')
+    .max(200, 'không được vượt quá 200 ký tự'),
+  contactName: z.string().max(100, 'không được vượt quá 100 ký tự').optional().nullable(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Xác nhận mật khẩu phải trùng khớp với mật khẩu',
+  path: ['confirmPassword'],
+});
 
-export const loginSchema: ValidationSchema = {
-  email: { type: 'email', required: true },
-  password: { type: 'string', required: true },
-};
+export const loginSchema = z.object({
+  email: z.string({ message: 'là bắt buộc' }).email('phải là email hợp lệ'),
+  password: z.string({ message: 'là bắt buộc' }).min(1, 'là bắt buộc'),
+});
 
-export const forgotPasswordSchema: ValidationSchema = {
-  email: { type: 'email', required: true },
-};
+export const forgotPasswordSchema = z.object({
+  email: z.string({ message: 'là bắt buộc' }).email('phải là email hợp lệ'),
+});
 
-export const resetPasswordSchema: ValidationSchema = {
-  token: { type: 'string', required: true },
-  newPassword: { type: 'string', required: true, minLength: 6 },
-  confirmPassword: { type: 'string', required: true, matchField: 'newPassword' },
-};
+export const resetPasswordSchema = z.object({
+  token: z.string({ message: 'là bắt buộc' }).min(1, 'là bắt buộc'),
+  newPassword: z.string({ message: 'là bắt buộc' }).min(6, 'phải có ít nhất 6 ký tự'),
+  confirmPassword: z.string({ message: 'là bắt buộc' }),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+  message: 'Xác nhận mật khẩu phải trùng khớp với mật khẩu mới',
+  path: ['confirmPassword'],
+});
 
-export const changePasswordSchema: ValidationSchema = {
-  currentPassword: { type: 'string', required: true },
-  newPassword: { type: 'string', required: true, minLength: 6 },
-};
+export const changePasswordSchema = z.object({
+  currentPassword: z.string({ message: 'là bắt buộc' }).min(1, 'là bắt buộc'),
+  newPassword: z.string({ message: 'là bắt buộc' }).min(6, 'phải có ít nhất 6 ký tự'),
+});
 
-export const refreshTokenSchema: ValidationSchema = {
-  refreshToken: { type: 'string', required: true },
-};
+export const refreshTokenSchema = z.object({
+  refreshToken: z.string({ message: 'là bắt buộc' }).min(1, 'là bắt buộc'),
+});

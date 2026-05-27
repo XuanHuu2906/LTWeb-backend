@@ -1,4 +1,4 @@
-import prisma from '../../config/database';
+import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 
 interface JobFilters {
@@ -38,12 +38,23 @@ export const findAll = async (
   return { jobs, total };
 };
 
-export const softDelete = async (id: number) => {
+export const softDelete = async (id: number, adminId: number) => {
   const job = await prisma.jobPosting.findUnique({ where: { id } });
   if (!job) throw new AppError(404, 'Job không tồn tại');
 
-  await prisma.jobPosting.update({
-    where: { id },
-    data: { deletedAt: new Date(), status: 'closed' },
+  await prisma.$transaction(async (tx) => {
+    await tx.jobPosting.update({
+      where: { id },
+      data: { deletedAt: new Date(), status: 'closed' },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        adminId,
+        action: 'delete_job_posting',
+        targetType: 'job_posting',
+        targetId: id,
+      },
+    });
   });
 };

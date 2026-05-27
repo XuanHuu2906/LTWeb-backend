@@ -1,44 +1,12 @@
-type Validator = (value: any) => string | null;
+import { z } from 'zod';
 
-const requiredNumber =
-  (fieldName: string): Validator =>
-  (value) => {
-    if (value === undefined || value === null) return `${fieldName} là bắt buộc`;
-    if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
-      return `${fieldName} phải là số nguyên dương`;
-    }
-    return null;
-  };
+export const createConversationSchema = z.object({
+  recruiterProfileId: z.number({ message: 'là bắt buộc' }).int('phải là số nguyên').positive('phải là số dương'),
+  jobPostingId: z.number().int('phải là số nguyên').positive('phải là số dương').optional().nullable(),
+});
 
-const optionalNumber =
-  (fieldName: string): Validator =>
-  (value) => {
-    if (value === undefined || value === null) return null;
-    if (typeof value !== 'number' || !Number.isInteger(value) || value <= 0) {
-      return `${fieldName} phải là số nguyên dương`;
-    }
-    return null;
-  };
-
-const requiredString =
-  (fieldName: string, minLength: number, maxLength: number): Validator =>
-  (value) => {
-    if (value === undefined || value === null) return `${fieldName} là bắt buộc`;
-    if (typeof value !== 'string') return `${fieldName} phải là chuỗi`;
-    if (value.trim().length < minLength) {
-      return `${fieldName} phải có ít nhất ${minLength} ký tự`;
-    }
-    if (value.length > maxLength) {
-      return `${fieldName} không được vượt quá ${maxLength} ký tự`;
-    }
-    return null;
-  };
-
-export const createConversationSchema: Record<string, Validator> = {
-  recruiterProfileId: requiredNumber('recruiterProfileId'),
-  jobPostingId: optionalNumber('jobPostingId'),
-};
-
-export const sendMessageSchema: Record<string, Validator> = {
-  content: requiredString('content', 1, 10000),
-};
+export const sendMessageSchema = z.object({
+  content: z.string({ message: 'là bắt buộc' })
+    .min(1, 'không được bỏ trống')
+    .max(10000, 'không được vượt quá 10000 ký tự'),
+});
