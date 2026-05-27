@@ -31,6 +31,7 @@ model User {
   notifications      Notification[]
   emailQueue         EmailQueue[]
   messages           Message[]
+  auditLogs          AuditLog[]
 
   @@map("users")
 }
@@ -390,4 +391,18 @@ model Message {
   @@index([senderId])
   @@index([sentAt])
   @@map("messages")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  adminId    Int      @map("admin_id")
+  action     String   // e.g. "delete_user", "toggle_user_status", "force_delete_job"
+  targetType String   @map("target_type") // e.g. "user", "job_posting"
+  targetId   Int      @map("target_id")
+  details    String?  // Thông tin chi tiết (JSON string)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  admin      User     @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
 }

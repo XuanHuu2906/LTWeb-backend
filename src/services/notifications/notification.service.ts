@@ -1,6 +1,7 @@
-import prisma from '../../config/database';
+import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { sendEmail } from '../../utils/email';
+import { addEmailJob } from '../../utils/email.queue';
 
 // ── Find All (paginated) ────────────────────────────────────────────────────
 export const findAll = async (
@@ -75,9 +76,16 @@ export const queueEmail = async (
   subject: string,
   bodyHtml: string
 ) => {
-  return prisma.emailQueue.create({
+  const email = await prisma.emailQueue.create({
     data: { userId, toEmail, subject, bodyHtml, status: 'pending' },
   });
+
+  // Gửi email bất đồng bộ thông qua hàng đợi BullMQ + Redis
+  addEmailJob(email.id).catch((err) => {
+    console.error(`[BullMQ] Không thể thêm email ID ${email.id} vào hàng đợi:`, err);
+  });
+
+  return email;
 };
 
 // ── Create Application Notification ─────────────────────────────────────────
@@ -97,7 +105,6 @@ export const createApplicationNotification = async (
   );
 };
 
-// ── Create Feedback Notification ────────────────────────────────────────────
 export const createFeedbackNotification = async (
   candidateUserId: number,
   companyName: string,
@@ -106,31 +113,8 @@ export const createFeedbackNotification = async (
   return create(
     candidateUserId,
     'feedback_received',
-    'Phản hồi mới',
-    `${companyName} đã phản hồi đơn ứng tuyển vị trí ${jobTitle}`,
+    'Phản hồi ứng tuyển',
+    `Công ty ${companyName} đã phản hồi về ứng tuyển của bạn cho vị trí ${jobTitle}`,
     'application'
   );
-};
-
-// ── Process Email Queue ─────────────────────────────────────────────────────
-export const processEmailQueue = async () => {
-  const emails = await prisma.emailQueue.findMany({
-    where: { status: 'pending', retryCount: { lt: 3 } },
-    take: 10,
-  });
-
-  for (const email of emails) {
-    try {
-      await sendEmail(email.toEmail, email.subject, email.bodyHtml);
-      await prisma.emailQueue.update({
-        where: { id: email.id },
-        data: { status: 'sent', sentAt: new Date() },
-      });
-    } catch (err: any) {
-      await prisma.emailQueue.update({
-        where: { id: email.id },
-        data: { retryCount: { increment: 1 }, errorMsg: err.message },
-      });
-    }
-  }
 };

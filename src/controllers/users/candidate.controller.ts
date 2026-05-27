@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import prisma from '../../config/database';
+import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 
 const getCurrentUserId = (req: Request) => {

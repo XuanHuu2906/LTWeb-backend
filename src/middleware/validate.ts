@@ -1,83 +1,51 @@
 import { Request, Response, NextFunction } from 'express';
+import { ZodSchema } from 'zod';
 import { AppError } from './errorHandler';
 
-interface FieldRule {
-  type: 'string' | 'email' | 'number';
-  required?: boolean;
-  minLength?: number;
-  maxLength?: number;
-  enum?: string[];
-  matchField?: string;
+export interface ValidationSchemaObject {
+  body?: ZodSchema;
+  query?: ZodSchema;
+  params?: ZodSchema;
 }
 
-export type ValidationSchema = {
-  [key: string]: FieldRule;
-};
-
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-export const validate = (schema: ValidationSchema) => {
+export const validate = (schema: ZodSchema | ValidationSchemaObject) => {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const errors: string[] = [];
-    const body = req.body || {};
-
-    for (const [field, rule] of Object.entries(schema)) {
-      const value = body[field];
-
-      // Check required
-      if (rule.required && (value === undefined || value === null || value === '')) {
-        errors.push(`${field} là bắt buộc`);
-        continue;
+    if ('safeParse' in schema) {
+      // Direct ZodSchema passed, default to validating req.body
+      const result = schema.safeParse(req.body);
+      if (!result.success) {
+        const errorMessages = result.error.issues
+          .map((issue) => {
+            const fieldName = issue.path.join('.');
+            return `${fieldName || 'Dữ liệu'}: ${issue.message}`;
+          })
+          .join('; ');
+        throw new AppError(400, errorMessages);
       }
-
-      // Skip optional empty fields
-      if (value === undefined || value === null || value === '') {
-        continue;
-      }
-
-      // Check type
-      if (rule.type === 'email') {
-        if (typeof value !== 'string' || !EMAIL_REGEX.test(value)) {
-          errors.push(`${field} phải là email hợp lệ`);
-          continue;
+      req.body = result.data;
+    } else {
+      // Object containing body, query, and/or params schemas
+      const targets: ('body' | 'query' | 'params')[] = ['body', 'query', 'params'];
+      
+      for (const target of targets) {
+        const subSchema = schema[target];
+        if (subSchema) {
+          const result = subSchema.safeParse(req[target]);
+          if (!result.success) {
+            const errorMessages = result.error.issues
+              .map((issue) => {
+                const fieldName = issue.path.join('.');
+                return `[${target}] ${fieldName || 'Trường dữ liệu'}: ${issue.message}`;
+              })
+              .join('; ');
+            throw new AppError(400, errorMessages);
+          }
+          // Assign parsed and coerced data back to request target
+          req[target] = result.data as any;
         }
-      } else if (rule.type === 'string') {
-        if (typeof value !== 'string') {
-          errors.push(`${field} phải là chuỗi`);
-          continue;
-        }
-      } else if (rule.type === 'number') {
-        if (typeof value !== 'number' && isNaN(Number(value))) {
-          errors.push(`${field} phải là số`);
-          continue;
-        }
-      }
-
-      // Check minLength
-      if (rule.minLength !== undefined && typeof value === 'string' && value.length < rule.minLength) {
-        errors.push(`${field} phải có ít nhất ${rule.minLength} ký tự`);
-      }
-
-      // Check maxLength
-      if (rule.maxLength !== undefined && typeof value === 'string' && value.length > rule.maxLength) {
-        errors.push(`${field} không được vượt quá ${rule.maxLength} ký tự`);
-      }
-
-      // Check enum
-      if (rule.enum && !rule.enum.includes(value)) {
-        errors.push(`${field} phải là một trong: ${rule.enum.join(', ')}`);
-      }
-
-      // Check matchField
-      if (rule.matchField && value !== body[rule.matchField]) {
-        errors.push(`${field} phải khớp với ${rule.matchField}`);
       }
     }
-
-    if (errors.length > 0) {
-      throw new AppError(400, errors.join('; '));
-    }
-
     next();
   };
 };
+

@@ -22,12 +22,14 @@ export const upload = multer({
   storage,
   limits: { fileSize: env.upload.maxFileSize },
   fileFilter: (_req, file, cb) => {
-    const allowed = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
+    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) {
+    
+    if (allowedExtensions.includes(ext) && allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type'));
+      cb(new Error('Định dạng file không hợp lệ. Chỉ cho phép tải lên file PDF, JPG, JPEG, PNG.'));
     }
   },
 });
