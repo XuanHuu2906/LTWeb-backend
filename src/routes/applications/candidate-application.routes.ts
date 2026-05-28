@@ -3,7 +3,7 @@ import {
   applyJob,
   getApplicationDetail,
   getMyApplications,
-} from '../../controllers/applications/candidate.controller';
+} from '../../controllers/applications/candidate-application.controller';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { applySchema } from '../../validations/applications/application.validation';

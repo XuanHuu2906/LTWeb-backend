@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
-import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { candidateProfileService } from '../../services/users/candidate-profile.service';
 
 const getCurrentUserId = (req: Request) => {
   if (!req.user?.id) {
@@ -29,14 +29,7 @@ export const getCandidateProfile = async (
   next: NextFunction,
 ) => {
   try {
-    const profile = await prisma.candidateProfile.findUnique({
-      where: { userId: getCurrentUserId(req) },
-    });
-
-    if (!profile) {
-      throw new AppError(404, 'Hồ sơ ứng viên không tồn tại');
-    }
-
+    const profile = await candidateProfileService.findByUserId(getCurrentUserId(req));
     return res.json({ success: true, data: profile });
   } catch (error) {
     return next(error);
@@ -53,23 +46,12 @@ export const updateCandidateProfile = async (
     const { fullName, phone, address, bio } = req.body;
     const dateOfBirth = parseDateOfBirth(req.body.dateOfBirth);
 
-    const profile = await prisma.candidateProfile.upsert({
-      where: { userId },
-      create: {
-        userId,
-        fullName,
-        phone,
-        address,
-        dateOfBirth,
-        bio,
-      },
-      update: {
-        fullName,
-        phone,
-        address,
-        dateOfBirth,
-        bio,
-      },
+    const profile = await candidateProfileService.upsert(userId, {
+      fullName,
+      phone,
+      address,
+      dateOfBirth,
+      bio,
     });
 
     return res.json({ success: true, data: profile });
@@ -86,13 +68,9 @@ export const uploadAvatar = async (req: Request, res: Response, next: NextFuncti
       throw new AppError(400, 'Vui lòng chọn file avatar');
     }
 
-    const profile = await prisma.candidateProfile.update({
-      where: { userId },
-      data: { avatarUrl: req.file.path },
-      select: { avatarUrl: true },
-    });
+    const avatarUrl = await candidateProfileService.updateAvatar(userId, req.file.path);
 
-    return res.json({ success: true, data: { avatarUrl: profile.avatarUrl } });
+    return res.json({ success: true, data: { avatarUrl } });
   } catch (error) {
     return next(error);
   }

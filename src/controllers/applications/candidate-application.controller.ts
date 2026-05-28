@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { AppError } from '../../middleware/errorHandler';
-import { candidateApplicationService } from '../../services/applications/candidate.service';
+import { candidateApplicationService } from '../../services/applications/candidate-application.service';
 
 const firstQueryValue = (value: unknown) => {
   if (Array.isArray(value)) return value[0];
