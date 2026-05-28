@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import { AppError } from '../../middleware/errorHandler';
-import { cvService } from '../../services/cvs/candidate.service';
+import { cvService } from '../../services/cvs/cv.service';
 
 const getCurrentUserId = (req: Request) => {
   if (!req.user?.id) {

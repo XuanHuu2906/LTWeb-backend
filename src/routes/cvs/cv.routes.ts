@@ -7,7 +7,7 @@ import {
   setCvStatus,
   updateCv,
   uploadCv,
-} from '../../controllers/cvs/candidate.controller';
+} from '../../controllers/cvs/cv.controller';
 import { authenticate } from '../../middleware/auth';
 import { upload } from '../../middleware/upload';
 import { validate } from '../../middleware/validate';
