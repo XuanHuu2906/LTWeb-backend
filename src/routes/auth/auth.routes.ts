@@ -11,6 +11,8 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
   changePasswordSchema,
+  googleLoginSchema,
+  completeOnboardingSchema,
 } from '../../validations/auth/auth.validation';
 
 const router = Router();
@@ -106,13 +108,18 @@ router.post(
  */
 router.post('/login', authLimiter, validate(loginSchema), authController.login);
 
+router.post('/google-login', authLimiter, validate(googleLoginSchema), authController.googleLogin);
+
 router.post('/refresh-token', validate(refreshTokenSchema), authController.refreshToken);
+
 
 router.post('/forgot-password', validate(forgotPasswordSchema), authController.forgotPassword);
 
 router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 
 // Protected routes (require authentication)
+router.post('/complete-onboarding', authenticate, validate(completeOnboardingSchema), authController.completeOnboarding);
+
 router.post('/logout', authenticate, authController.logout);
 
 router.get('/me', authenticate, authController.getMe);

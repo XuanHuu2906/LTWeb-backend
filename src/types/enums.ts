@@ -1,4 +1,5 @@
-export type UserRole = 'candidate' | 'recruiter' | 'admin';
+export const USER_ROLES = ['candidate', 'recruiter', 'admin', 'pending'] as const;
+export type UserRole = typeof USER_ROLES[number];
 export type UserStatus = 'active' | 'inactive' | 'banned';
 
 export type JobType = 'full_time' | 'part_time' | 'remote' | 'internship' | 'contract';

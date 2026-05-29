@@ -293,4 +293,267 @@ export const authService = {
       })
     ]);
   },
+
+  async googleLogin(supabaseAccessToken: string) {
+    // 1. Xác thực supabaseAccessToken với máy chủ Supabase
+    let email = '';
+    let rawFullName = 'Người dùng Google';
+
+    try {
+      const response = await fetch(`${env.supabase.url}/auth/v1/user`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${supabaseAccessToken}`,
+          'apikey': env.supabase.anonKey,
+        },
+      });
+
+      if (!response.ok) {
+        throw new AppError(401, 'Mã xác thực Google không hợp lệ hoặc đã hết hạn');
+      }
+
+      const supabaseUser = (await response.json()) as any;
+      email = supabaseUser.email;
+      rawFullName = supabaseUser.user_metadata?.full_name || 
+                    supabaseUser.user_metadata?.name || 
+                    supabaseUser.email?.split('@')[0] || 
+                    'Người dùng';
+    } catch (err: any) {
+      if (err instanceof AppError) throw err;
+      console.error('Lỗi khi gọi API xác thực Supabase:', err);
+      throw new AppError(401, 'Xác thực tài khoản với Supabase thất bại');
+    }
+
+    if (!email) {
+      throw new AppError(400, 'Không thể lấy thông tin email từ Google Session');
+    }
+
+    // 2. Tìm người dùng bằng email
+    let user = await prisma.user.findUnique({
+      where: { email },
+      include: {
+        candidateProfile: true,
+        recruiterProfile: true,
+      },
+    });
+
+    // 3. Nếu chưa có người dùng, tự động tạo mới với role = 'pending'
+    if (!user) {
+      const randomPassword = crypto.randomBytes(16).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      try {
+        user = await prisma.$transaction(async (tx) => {
+          const newUser = await tx.user.create({
+            data: {
+              email,
+              passwordHash: hashedPassword,
+              role: 'pending',
+              status: 'active',
+            },
+          });
+
+          return {
+            ...newUser,
+            candidateProfile: null,
+            recruiterProfile: null,
+          } as any;
+        });
+      } catch (err: any) {
+        if (err.code === 'P2002') {
+          user = await prisma.user.findUnique({
+            where: { email },
+            include: {
+              candidateProfile: true,
+              recruiterProfile: true,
+            },
+          });
+          if (!user) throw err;
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    if (!user) {
+      throw new AppError(500, 'Không thể khởi tạo hoặc định vị tài khoản người dùng');
+    }
+
+    // 4. Nếu tài khoản bị khóa
+    if (user.deletedAt) throw new AppError(401, 'Tài khoản không tồn tại');
+    if (user.status === 'banned') throw new AppError(403, 'Tài khoản đã bị khóa');
+
+    // 5. Sinh access token và refresh token
+    const accessToken = jwt.sign(
+      { id: user.id, email: user.email, role: user.role },
+      env.jwtSecret,
+      { expiresIn: '15m' }
+    );
+
+    const refreshToken = crypto.randomBytes(40).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash,
+        expiresAt: new Date(Date.now() + parseDuration(env.jwtRefreshExpiresIn))
+      },
+    });
+
+    return {
+      accessToken,
+      refreshToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        fullName: user.role === 'candidate' 
+          ? user.candidateProfile?.fullName 
+          : (user.role === 'recruiter' ? user.recruiterProfile?.companyName : rawFullName.trim()),
+        profile: user.role === 'candidate' ? user.candidateProfile : user.recruiterProfile,
+      },
+    };
+  },
+
+  async completeOnboarding(
+    userId: number,
+    role: 'candidate' | 'recruiter',
+    fullName: string,
+    companyName: string | null | undefined,
+    oldRefreshToken: string
+  ) {
+    const normalizedFullName = fullName.trim();
+    const normalizedCompanyName = companyName?.trim();
+
+    // 1. Kiểm tra tính hợp lệ và tính sở hữu của refresh token pending cũ
+    const oldTokenHash = crypto.createHash('sha256').update(oldRefreshToken).digest('hex');
+    
+    const authResult = await prisma.$transaction(async (tx) => {
+      // Xác nhận token tồn tại, thuộc đúng user, chưa bị revoke, chưa hết hạn
+      const oldToken = await tx.refreshToken.findUnique({
+        where: { tokenHash: oldTokenHash },
+      });
+
+      if (
+        !oldToken ||
+        oldToken.userId !== userId ||
+        oldToken.revokedAt ||
+        oldToken.expiresAt < new Date()
+      ) {
+        throw new AppError(401, 'Phiên làm việc tạm thời không hợp lệ hoặc đã hết hạn');
+      }
+
+      // 2. Chống race condition: Cập nhật User.role từ 'pending' sang vai trò mới một cách nguyên tử
+      const updated = await tx.user.updateMany({
+        where: {
+          id: userId,
+          role: 'pending',
+        },
+        data: {
+          role,
+        },
+      });
+
+      if (updated.count !== 1) {
+        throw new AppError(400, 'Tài khoản đã hoàn tất thiết lập hồ sơ trước đó');
+      }
+
+      // 3. Tạo profile tương ứng
+      let createdProfile: any = null;
+      if (role === 'candidate') {
+        createdProfile = await tx.candidateProfile.create({
+          data: {
+            userId,
+            fullName: normalizedFullName,
+          },
+        });
+      } else {
+        createdProfile = await tx.recruiterProfile.create({
+          data: {
+            userId,
+            companyName: normalizedCompanyName || `${normalizedFullName}'s Company`,
+            contactName: normalizedFullName,
+          },
+        });
+      }
+
+      // 4. Vô hiệu hóa refresh token pending cũ
+      await tx.refreshToken.update({
+        where: { id: oldToken.id },
+        data: { revokedAt: new Date() },
+      });
+
+      // 5. Cấp cặp token chính thức mới
+      const newAccessToken = jwt.sign(
+        { id: userId, email: 'placeholder@domain.com', role },
+        env.jwtSecret,
+        { expiresIn: '15m' }
+      );
+
+      const newRefreshToken = crypto.randomBytes(40).toString('hex');
+      const newTokenHash = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
+
+      await tx.refreshToken.create({
+        data: {
+          userId,
+          tokenHash: newTokenHash,
+          expiresAt: new Date(Date.now() + parseDuration(env.jwtRefreshExpiresIn))
+        },
+      });
+
+      return {
+        accessToken: newAccessToken,
+        refreshToken: newRefreshToken,
+        role,
+        profile: createdProfile,
+      };
+    });
+
+    // 6. Sau transaction thành công, tìm kiếm thông tin email để ghi token thực tế và queue email chào mừng
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (user) {
+      // Ghi đè accessToken chuẩn chứa đúng email
+      const realAccessToken = jwt.sign(
+        { id: userId, email: user.email, role: authResult.role },
+        env.jwtSecret,
+        { expiresIn: '15m' }
+      );
+      authResult.accessToken = realAccessToken;
+
+      // Đưa tác vụ gửi email vào emailQueue ngoài transaction, an toàn với try-catch
+      try {
+        await prisma.emailQueue.create({
+          data: {
+            userId,
+            toEmail: user.email,
+            subject: role === 'candidate' 
+              ? 'Chào mừng bạn đến với HireArch (Ứng viên)'
+              : 'Chào mừng nhà tuyển dụng đến với HireArch',
+            bodyHtml: role === 'candidate'
+              ? `<p>Xin chào ${normalizedFullName},</p><p>Hồ sơ ứng viên của bạn đã được thiết lập thành công bằng Google.</p>`
+              : `<p>Xin chào ${normalizedFullName},</p><p>Hồ sơ nhà tuyển dụng cho ${normalizedCompanyName} đã được tạo thành công.</p>`,
+          }
+        });
+      } catch (err: any) {
+        console.warn('[BullMQ] Gửi email chào mừng thất bại, ghi log warning nhưng không rollback onboarding:', err.message);
+      }
+    }
+
+    return {
+      accessToken: authResult.accessToken,
+      refreshToken: authResult.refreshToken,
+      user: {
+        id: userId,
+        email: user?.email || '',
+        role: authResult.role,
+        fullName: normalizedFullName,
+        profile: authResult.profile,
+      },
+    };
+  },
 };
+
