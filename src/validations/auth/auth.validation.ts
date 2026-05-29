@@ -55,3 +55,22 @@ export const changePasswordSchema = z.object({
 export const refreshTokenSchema = z.object({
   refreshToken: z.string({ message: 'là bắt buộc' }).min(1, 'là bắt buộc'),
 });
+
+export const googleLoginSchema = z.object({
+  supabaseAccessToken: z.string({ message: 'Supabase Access Token là bắt buộc' }).min(1, 'Supabase Access Token không được để trống'),
+});
+
+export const completeOnboardingSchema = z.object({
+  role: z.enum(['candidate', 'recruiter'], { message: 'Vai trò phải là candidate hoặc recruiter' }),
+  fullName: z.string({ message: 'Họ và tên là bắt buộc' }).min(1, 'Họ và tên không được để trống').max(100, 'Họ và tên không được vượt quá 100 ký tự'),
+  companyName: z.string().max(200, 'Tên công ty không được vượt quá 200 ký tự').optional().nullable(),
+  refreshToken: z.string({ message: 'Refresh token là bắt buộc' }).min(1, 'Refresh token không được để trống'),
+}).refine((data) => {
+  if (data.role === 'recruiter' && (!data.companyName || data.companyName.trim() === '')) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Tên công ty là bắt buộc đối với nhà tuyển dụng',
+  path: ['companyName'],
+});

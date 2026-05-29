@@ -9,6 +9,12 @@ if (!process.env.JWT_SECRET) {
 if (!process.env.JWT_REFRESH_SECRET) {
   throw new Error('JWT_REFRESH_SECRET environment variable is required');
 }
+if (!process.env.SUPABASE_URL) {
+  throw new Error('SUPABASE_URL environment variable is required');
+}
+if (!process.env.SUPABASE_ANON_KEY) {
+  throw new Error('SUPABASE_ANON_KEY environment variable is required');
+}
 
 export const env = {
   port: parseInt(process.env.PORT || '3000', 10),
@@ -35,5 +41,9 @@ export const env = {
   upload: {
     dir: process.env.UPLOAD_DIR || 'uploads',
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '5242880', 10),
+  },
+  supabase: {
+    url: process.env.SUPABASE_URL,
+    anonKey: process.env.SUPABASE_ANON_KEY,
   },
 };

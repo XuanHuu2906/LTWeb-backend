@@ -58,3 +58,34 @@ export const softDelete = async (id: number, adminId: number) => {
     });
   });
 };
+
+export const updateStatus = async (
+  id: number,
+  status: string,
+  rejectionReason: string | undefined,
+  adminId: number
+) => {
+  const job = await prisma.jobPosting.findUnique({ where: { id } });
+  if (!job) throw new AppError(404, 'Job không tồn tại');
+
+  const updatedJob = await prisma.$transaction(async (tx) => {
+    const updated = await tx.jobPosting.update({
+      where: { id },
+      data: { status, rejectionReason },
+    });
+
+    await tx.auditLog.create({
+      data: {
+        adminId,
+        action: `update_job_status_${status}`,
+        targetType: 'job_posting',
+        targetId: id,
+        details: rejectionReason ? JSON.stringify({ rejectionReason }) : null,
+      },
+    });
+
+    return updated;
+  });
+
+  return updatedJob;
+};

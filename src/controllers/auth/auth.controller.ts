@@ -63,6 +63,21 @@ export const changePassword = async (req: Request, res: Response) => {
   res.json(messageResponse('Đổi mật khẩu thành công'));
 };
 
+export const googleLogin = async (req: Request, res: Response) => {
+  const { supabaseAccessToken } = req.body;
+  const data = await authService.googleLogin(supabaseAccessToken);
+  res.json(successResponse(data, 'Đăng nhập Google thành công'));
+};
+
+export const completeOnboarding = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  if (!userId) throw new AppError(401, 'Unauthorized');
+
+  const { role, fullName, companyName, refreshToken } = req.body;
+  const data = await authService.completeOnboarding(userId, role, fullName, companyName, refreshToken);
+  res.json(successResponse(data, 'Thiết lập hồ sơ thành công'));
+};
+
 export const authController = {
   registerCandidate,
   registerRecruiter,
@@ -73,4 +88,7 @@ export const authController = {
   resetPassword,
   getMe,
   changePassword,
+  googleLogin,
+  completeOnboarding,
 };
+

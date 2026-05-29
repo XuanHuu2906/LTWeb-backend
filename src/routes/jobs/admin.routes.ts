@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticate, authorize('admin'));
 
 router.get('/', adminController.getAllJobs);
+router.patch('/:id/status', adminController.updateJobStatus);
 router.delete('/:id', adminController.forceDeleteJob);
 
 export default router;
