@@ -38,14 +38,36 @@ const getPagination = (req: Request): Pagination => ({
   limit: Math.min(parsePositiveInt(req.query.limit, 10), 100),
 });
 
-const getFilters = (req: Request): JobFilters => ({
-  location: parseStringQuery(req.query.location),
-  jobType: parseStringQuery(req.query.jobType),
-  experienceLevel: parseStringQuery(req.query.experienceLevel),
-  categoryId: parseNumberQuery(req.query.categoryId),
-  salaryMin: parseNumberQuery(req.query.salaryMin),
-  salaryMax: parseNumberQuery(req.query.salaryMax),
-});
+const getFilters = (req: Request): JobFilters => {
+  const salaryMin = parseNumberQuery(req.query.salaryMin);
+  const salaryMax = parseNumberQuery(req.query.salaryMax);
+  const categoryId = parseNumberQuery(req.query.categoryId);
+
+  if (salaryMin !== undefined && salaryMin < 0) {
+    throw new AppError(400, 'salaryMin must be greater than or equal to 0');
+  }
+
+  if (salaryMax !== undefined && salaryMax < 0) {
+    throw new AppError(400, 'salaryMax must be greater than or equal to 0');
+  }
+
+  if (salaryMin !== undefined && salaryMax !== undefined && salaryMin > salaryMax) {
+    throw new AppError(400, 'salaryMin must be less than or equal to salaryMax');
+  }
+
+  if (categoryId !== undefined && (!Number.isInteger(categoryId) || categoryId <= 0)) {
+    throw new AppError(400, 'categoryId must be a positive integer');
+  }
+
+  return {
+    location: parseStringQuery(req.query.location),
+    jobType: parseStringQuery(req.query.jobType),
+    experienceLevel: parseStringQuery(req.query.experienceLevel),
+    categoryId,
+    salaryMin,
+    salaryMax,
+  };
+};
 
 const parseId = (value: string | string[] | undefined) => {
   if (typeof value !== 'string') {

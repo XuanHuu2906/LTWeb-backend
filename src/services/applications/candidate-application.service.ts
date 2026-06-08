@@ -1,5 +1,5 @@
-import { prisma } from '../../utils/prisma';
-import { AppError } from '../../middleware/errorHandler';
+import { prisma } from "../../utils/prisma";
+import { AppError } from "../../middleware/errorHandler";
 
 type ApplyInput = {
   jobPostingId: number;
@@ -18,16 +18,22 @@ const getPagination = ({ page, limit }: Pagination) => ({
 });
 
 const getCandidateProfile = async (userId: number) => {
-  const profile = await prisma.candidateProfile.findUnique({ where: { userId } });
+  const profile = await prisma.candidateProfile.findUnique({
+    where: { userId },
+  });
 
   if (!profile) {
-    throw new AppError(404, 'Hồ sơ ứng viên không tồn tại');
+    throw new AppError(404, "Hồ sơ ứng viên không tồn tại");
   }
 
   return profile;
 };
 
-const toPaginatedResult = <T>(items: T[], total: number, pagination: Pagination) => ({
+const toPaginatedResult = <T>(
+  items: T[],
+  total: number,
+  pagination: Pagination,
+) => ({
   items,
   meta: {
     total,
@@ -45,10 +51,10 @@ const createRecruiterNotification = async (
   await prisma.notification.create({
     data: {
       userId: recruiterId,
-      type: 'application',
-      title: 'Có ứng viên mới',
+      type: "new_applicant",
+      title: "Có ứng viên mới",
       message: `Một ứng viên vừa ứng tuyển vị trí ${jobTitle}`,
-      relatedType: 'application',
+      relatedType: "application",
       relatedId: applicationId,
     },
   });
@@ -68,13 +74,13 @@ export const candidateApplicationService = {
     });
 
     if (existing) {
-      throw new AppError(409, 'Bạn đã ứng tuyển vị trí này');
+      throw new AppError(409, "Bạn đã ứng tuyển vị trí này");
     }
 
     const jobPosting = await prisma.jobPosting.findFirst({
       where: {
         id: data.jobPostingId,
-        status: 'active',
+        status: "active",
         deletedAt: null,
         expiresAt: { gte: new Date() },
       },
@@ -82,7 +88,7 @@ export const candidateApplicationService = {
     });
 
     if (!jobPosting) {
-      throw new AppError(404, 'Việc làm không tồn tại hoặc đã hết hạn');
+      throw new AppError(404, "Việc làm không tồn tại hoặc đã hết hạn");
     }
 
     const cv = await prisma.cV.findFirst({
@@ -91,7 +97,7 @@ export const candidateApplicationService = {
     });
 
     if (!cv) {
-      throw new AppError(404, 'CV không tồn tại');
+      throw new AppError(404, "CV không tồn tại");
     }
 
     const application = await prisma.application.create({
@@ -100,7 +106,7 @@ export const candidateApplicationService = {
         jobPostingId: data.jobPostingId,
         cvId: data.cvId,
         coverLetter: data.coverLetter,
-        status: 'pending',
+        status: "pending",
       },
       include: {
         jobPosting: { select: { title: true, recruiterId: true } },
@@ -145,9 +151,9 @@ export const candidateApplicationService = {
             },
           },
           cv: { select: { title: true, cvType: true } },
-          feedbacks: { take: 1, orderBy: { createdAt: 'desc' } },
+          feedbacks: { take: 1, orderBy: { createdAt: "desc" } },
         },
-        orderBy: { appliedAt: 'desc' },
+        orderBy: { appliedAt: "desc" },
         skip,
         take,
       }),
@@ -173,18 +179,18 @@ export const candidateApplicationService = {
           include: {
             recruiterProfile: { select: { companyName: true } },
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
         },
         evaluations: true,
       },
     });
 
     if (!application) {
-      throw new AppError(404, 'Đơn ứng tuyển không tồn tại');
+      throw new AppError(404, "Đơn ứng tuyển không tồn tại");
     }
 
     if (application.candidateProfileId !== candidateProfile.id) {
-      throw new AppError(403, 'Bạn không có quyền xem đơn ứng tuyển này');
+      throw new AppError(403, "Bạn không có quyền xem đơn ứng tuyển này");
     }
 
     return {
