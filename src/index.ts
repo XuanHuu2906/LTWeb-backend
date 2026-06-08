@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 import candidateApplicationRoutes from './routes/applications/candidate.routes';
@@ -18,6 +19,7 @@ app.use(helmet());
 app.use(morgan(env.nodeEnv === 'development' ? 'dev' : 'combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static(path.resolve(env.upload.dir)));
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {

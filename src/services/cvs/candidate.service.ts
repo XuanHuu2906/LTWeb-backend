@@ -161,7 +161,7 @@ export const cvService = {
         userId,
         title,
         cvType: 'uploaded',
-        pdfUrl: file.path,
+        pdfUrl: `/uploads/${file.filename}`,
         status: 'active',
       },
     });

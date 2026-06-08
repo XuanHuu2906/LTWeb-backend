@@ -88,7 +88,7 @@ export const uploadAvatar = async (req: Request, res: Response, next: NextFuncti
 
     const profile = await prisma.candidateProfile.update({
       where: { userId },
-      data: { avatarUrl: req.file.path },
+      data: { avatarUrl: `/uploads/${req.file.filename}` },
       select: { avatarUrl: true },
     });
 

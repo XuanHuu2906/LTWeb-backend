@@ -45,7 +45,7 @@ const createRecruiterNotification = async (
   await prisma.notification.create({
     data: {
       userId: recruiterId,
-      type: 'application',
+      type: 'new_applicant',
       title: 'Có ứng viên mới',
       message: `Một ứng viên vừa ứng tuyển vị trí ${jobTitle}`,
       relatedType: 'application',
