@@ -1,5 +1,5 @@
 import { UserRole } from '../../types/enums';
-import prisma from '../../config/database';
+import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 
 type Pagination = {

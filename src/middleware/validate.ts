@@ -1,75 +1,54 @@
-import { Request, Response, NextFunction } from 'express';
-import { AppError } from './errorHandler';
+import { Request, Response, NextFunction } from "express";
+import { ZodSchema } from "zod";
+import { AppError } from "./errorHandler";
 
-type Validator = (value: any) => string | null;
+export interface ValidationSchemaObject {
+  body?: ZodSchema;
+  query?: ZodSchema;
+  params?: ZodSchema;
+}
 
-type FieldRule = {
-  type?: 'string' | 'number' | 'email';
-  required?: boolean;
-  maxLength?: number;
-  minLength?: number;
-  enum?: any[];
-};
-
-type ValidationSchema = {
-  [key: string]: Validator | FieldRule;
-};
-
-export const validate = (schema: ValidationSchema) => {
+export const validate = (schema: ZodSchema | ValidationSchemaObject) => {
   return (req: Request, _res: Response, next: NextFunction) => {
-    const errors: string[] = [];
-
-    for (const [field, validatorOrRule] of Object.entries(schema)) {
-      const value = req.body[field];
-
-      if (typeof validatorOrRule === 'function') {
-        const error = validatorOrRule(value);
-        if (error) errors.push(error);
-        continue;
+    if ("safeParse" in schema) {
+      // Direct ZodSchema passed, default to validating req.body
+      const result = schema.safeParse(req.body);
+      if (!result.success) {
+        const errorMessages = result.error.issues
+          .map((issue) => {
+            const fieldName = issue.path.join(".");
+            return `${fieldName || "Dữ liệu"}: ${issue.message}`;
+          })
+          .join("; ");
+        throw new AppError(400, errorMessages);
       }
+      req.body = result.data;
+    } else {
+      // Object containing body, query, and/or params schemas
+      const targets: ("body" | "query" | "params")[] = [
+        "body",
+        "query",
+        "params",
+      ];
 
-      const rule = validatorOrRule;
-      const isEmpty = value === undefined || value === null || value === '';
-
-      if (rule.required && isEmpty) {
-        errors.push(`${field} is required`);
-        continue;
-      }
-
-      if (isEmpty) continue;
-
-      if (rule.type === 'string' && typeof value !== 'string') {
-        errors.push(`${field} must be a string`);
-      }
-
-      if (rule.type === 'number' && (typeof value !== 'number' || Number.isNaN(value))) {
-        errors.push(`${field} must be a number`);
-      }
-
-      if (
-        rule.type === 'email' &&
-        (typeof value !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
-      ) {
-        errors.push(`${field} must be a valid email`);
-      }
-
-      if (typeof value === 'string' && rule.minLength && value.length < rule.minLength) {
-        errors.push(`${field} must be at least ${rule.minLength} characters`);
-      }
-
-      if (typeof value === 'string' && rule.maxLength && value.length > rule.maxLength) {
-        errors.push(`${field} must not exceed ${rule.maxLength} characters`);
-      }
-
-      if (rule.enum && !rule.enum.includes(value)) {
-        errors.push(`${field} must be one of: ${rule.enum.join(', ')}`);
+      for (const target of targets) {
+        const subSchema = schema[target];
+        if (subSchema) {
+          const result = subSchema.safeParse(req[target]);
+          if (!result.success) {
+            const errorMessages = result.error.issues
+              .map((issue) => {
+                const fieldName = issue.path.join(".");
+                return `[${target}] ${fieldName || "Trường dữ liệu"}: ${issue.message}`;
+              })
+              .join("; ");
+            throw new AppError(400, errorMessages);
+          }
+          // Assign parsed and coerced data back to request target
+          req[target] = result.data as any;
+        }
       }
     }
-
-    if (errors.length > 0) {
-      throw new AppError(400, errors.join('; '));
-    }
-
     next();
   };
 };

@@ -1,5 +1,5 @@
 import { Prisma } from '@prisma/client';
-import prisma from '../../config/database';
+import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 
 export type JobFilters = {

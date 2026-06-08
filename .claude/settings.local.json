@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rtk ls *)",
+      "Bash(Get-ChildItem -Path \"D:\\\\LTWeb\\\\LTWeb-backend\" -Depth 1)",
+      "Bash(Select-Object Name, Mode)",
+      "Bash(Format-Table -AutoSize)",
+      "Bash(Get-ChildItem *)",
+      "Bash(dir D:\\\\LTWeb\\\\LTWeb-frontend\\\\src\\\\styles *)"
+    ]
+  }
+}
