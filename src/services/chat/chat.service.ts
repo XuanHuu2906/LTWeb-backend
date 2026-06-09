@@ -1,6 +1,7 @@
 import { UserRole } from '../../types/enums';
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { supabaseStorageService } from '../storage/supabase-storage.service';
 
 type Pagination = {
   page: number;
@@ -110,6 +111,38 @@ export const chatService = {
     recruiterProfileId: number,
     jobPostingId?: number,
   ) {
+    if (!jobPostingId) {
+      throw new AppError(400, 'ID tin tuyển dụng là bắt buộc để mở cuộc trò chuyện');
+    }
+
+    // Kiểm tra ứng viên đã ứng tuyển đúng tin và recruiter thuộc tin đó.
+    const application = await prisma.application.findFirst({
+      where: {
+        candidateProfileId,
+        jobPostingId,
+        deletedAt: null,
+      },
+      include: {
+        jobPosting: { select: { recruiterId: true } },
+      },
+    });
+
+    if (!application) {
+      throw new AppError(403, 'Bạn chỉ có thể mở cuộc trò chuyện nếu đã ứng tuyển vào tin tuyển dụng này');
+    }
+
+    const recruiterProfile = await prisma.recruiterProfile.findFirst({
+      where: {
+        id: recruiterProfileId,
+        userId: application.jobPosting.recruiterId,
+      },
+      select: { id: true },
+    });
+
+    if (!recruiterProfile) {
+      throw new AppError(403, 'Nhà tuyển dụng không khớp với tin tuyển dụng này');
+    }
+
     const existing = await prisma.conversation.findFirst({
       where: {
         candidateProfileId,
@@ -155,8 +188,26 @@ export const chatService = {
       prisma.message.count({ where }),
     ]);
 
+    // Tạo Signed URL cho các tin nhắn chứa file đính kèm
+    const mappedMessages = await Promise.all(
+      messages.map(async (msg: any) => {
+        if (msg.messageType === 'file' && msg.attachmentPath) {
+          try {
+            msg.attachmentUrl = await supabaseStorageService.createSignedUrl(
+              msg.attachmentPath,
+              'chat-files',
+              600,
+            );
+          } catch (err) {
+            console.error(`Lỗi khi tạo Signed URL cho tin nhắn ${msg.id}:`, err);
+          }
+        }
+        return msg;
+      }),
+    );
+
     return {
-      items: messages,
+      items: mappedMessages,
       meta: {
         total,
         page: pagination.page,
@@ -180,6 +231,64 @@ export const chatService = {
     });
 
     await createMessageNotification(conversationId, senderId);
+
+    return message;
+  },
+
+  async createMessageWithAttachment(
+    conversationId: number,
+    senderId: number,
+    role: UserRole,
+    file: Express.Multer.File,
+    content?: string,
+  ) {
+    await findConversationForUser(conversationId, senderId, role);
+
+    // Upload attachment to private bucket 'chat-files'
+    const uploadResult = await supabaseStorageService.uploadFile(file, 'chat-files');
+
+    let message;
+    try {
+      message = await prisma.$transaction(async (tx) => {
+        const createdMessage = await tx.message.create({
+          data: {
+            conversationId,
+            senderId,
+            content: content?.trim() || null,
+            messageType: 'file',
+            attachmentPath: uploadResult.storagePath,
+            attachmentName: file.originalname,
+            attachmentMime: file.mimetype,
+            attachmentSize: file.size,
+          },
+          include: { sender: { select: { id: true, role: true } } },
+        });
+
+        await tx.conversation.update({
+          where: { id: conversationId },
+          data: { updatedAt: new Date() },
+        });
+
+        return createdMessage;
+      });
+    } catch (err) {
+      await supabaseStorageService.deleteFile(uploadResult.storagePath, 'chat-files');
+      throw err;
+    }
+
+    await createMessageNotification(conversationId, senderId);
+
+    // Generate signed URL for immediate preview/download
+    try {
+      const signedUrl = await supabaseStorageService.createSignedUrl(
+        uploadResult.storagePath,
+        'chat-files',
+        600,
+      );
+      (message as any).attachmentUrl = signedUrl;
+    } catch (err) {
+      console.error(`Lỗi khi tạo Signed URL cho tin nhắn mới tải lên ${message.id}:`, err);
+    }
 
     return message;
   },

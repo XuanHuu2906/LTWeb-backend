@@ -4,6 +4,7 @@ import fs from 'fs';
 import { env } from '../config/env';
 
 const uploadDir = path.resolve(env.upload.dir);
+const maxSupabaseUploadSize = 20 * 1024 * 1024;
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -20,16 +21,24 @@ const storage = multer.diskStorage({
 
 export const upload = multer({
   storage,
-  limits: { fileSize: env.upload.maxFileSize },
+  limits: { fileSize: Math.max(env.upload.maxFileSize, maxSupabaseUploadSize) },
   fileFilter: (_req, file, cb) => {
-    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png'];
-    const allowedMimeTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    const allowedExtensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.doc', '.docx'];
+    const allowedMimeTypes = [
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ];
     const ext = path.extname(file.originalname).toLowerCase();
     
     if (allowedExtensions.includes(ext) && allowedMimeTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Định dạng file không hợp lệ. Chỉ cho phép tải lên file PDF, JPG, JPEG, PNG.'));
+      cb(new Error('Định dạng file không hợp lệ. Chỉ cho phép tải lên PDF, JPG, JPEG, PNG, GIF, WEBP, DOC, DOCX.'));
     }
   },
 });

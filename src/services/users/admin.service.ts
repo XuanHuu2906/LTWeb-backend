@@ -174,4 +174,227 @@ export const userAdminService = {
       });
     });
   },
+
+  async getStats() {
+    const [
+      jobsCount,
+      cvsCount,
+      candidateCount,
+      recruiterCount,
+      jobsByStatus,
+      cvsByType,
+      recentUsers,
+      recentCvs,
+      recentJobs,
+    ] = await Promise.all([
+      prisma.jobPosting.count({ where: { deletedAt: null } }),
+      prisma.cV.count({ where: { deletedAt: null } }),
+      prisma.user.count({ where: { role: 'candidate', deletedAt: null } }),
+      prisma.user.count({ where: { role: 'recruiter', deletedAt: null } }),
+      
+      prisma.jobPosting.groupBy({
+        by: ['status'],
+        _count: true,
+        where: { deletedAt: null },
+      }),
+      
+      prisma.cV.groupBy({
+        by: ['cvType'],
+        _count: true,
+        where: { deletedAt: null },
+      }),
+
+      prisma.user.findMany({
+        where: { deletedAt: null, role: { in: ['candidate', 'recruiter'] } },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: {
+          candidateProfile: { select: { fullName: true } },
+          recruiterProfile: { select: { companyName: true } },
+        },
+      }),
+
+      prisma.cV.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: {
+          user: {
+            select: {
+              email: true,
+              candidateProfile: { select: { fullName: true } },
+            },
+          },
+        },
+      }),
+
+      prisma.jobPosting.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+        include: {
+          recruiter: {
+            select: {
+              email: true,
+              recruiterProfile: { select: { companyName: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const activities: any[] = [];
+
+    recentUsers.forEach(u => {
+      const isCandidate = u.role === 'candidate';
+      const name = isCandidate ? (u.candidateProfile?.fullName || u.email) : (u.recruiterProfile?.companyName || u.email);
+      activities.push({
+        id: `user-${u.id}`,
+        type: isCandidate ? 'registration' : 'recruiter_reg',
+        user: isCandidate ? `Ứng viên ${name}` : `Doanh nghiệp ${name}`,
+        message: isCandidate ? 'đã đăng ký tài khoản ứng viên mới thành công' : 'đăng ký tài khoản doanh nghiệp mới thành công',
+        createdAt: u.createdAt,
+        badgeText: isCandidate ? 'Thành viên mới' : 'Doanh nghiệp mới',
+        badgeColor: isCandidate ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-100',
+      });
+    });
+
+    recentCvs.forEach(cv => {
+      const name = cv.user.candidateProfile?.fullName || cv.user.email;
+      activities.push({
+        id: `cv-${cv.id}`,
+        type: 'cv_created',
+        user: `Ứng viên ${name}`,
+        message: cv.cvType === 'uploaded' ? `đã tải lên CV "${cv.title}"` : `đã khởi tạo CV "${cv.title}"`,
+        createdAt: cv.createdAt,
+        badgeText: 'Tạo CV',
+        badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+      });
+    });
+
+    recentJobs.forEach(job => {
+      const name = job.recruiter.recruiterProfile?.companyName || job.recruiter.email;
+      const isPending = job.status === 'pending';
+      activities.push({
+        id: `job-${job.id}`,
+        type: isPending ? 'approval' : 'job_posted',
+        user: isPending ? `Nhà tuyển dụng ${name}` : `Doanh nghiệp ${name}`,
+        message: isPending ? `yêu cầu phê duyệt tin tuyển dụng "${job.title}"` : `đăng tin tuyển dụng mới "${job.title}" thành công`,
+        createdAt: job.createdAt,
+        badgeText: isPending ? 'Chờ duyệt' : 'Tin mới',
+        badgeColor: isPending ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-green-50 text-green-700 border-green-100',
+      });
+    });
+
+    activities.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return {
+      kpis: {
+        jobs: jobsCount,
+        cvs: cvsCount,
+        candidates: candidateCount,
+        recruiters: recruiterCount,
+      },
+      jobsBreakdown: jobsByStatus.reduce((acc: any, curr: any) => {
+        acc[curr.status] = curr._count;
+        return acc;
+      }, {}),
+      cvsBreakdown: cvsByType.reduce((acc: any, curr: any) => {
+        acc[curr.cvType] = curr._count;
+        return acc;
+      }, {}),
+      activities: activities.slice(0, 10),
+    };
+  },
+
+  async getSystemActivities(limit = 50) {
+    const [
+      recentUsers,
+      recentCvs,
+      recentJobs,
+    ] = await Promise.all([
+      prisma.user.findMany({
+        where: { deletedAt: null, role: { in: ['candidate', 'recruiter'] } },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: {
+          candidateProfile: { select: { fullName: true } },
+          recruiterProfile: { select: { companyName: true } },
+        },
+      }),
+      prisma.cV.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: {
+          user: {
+            select: {
+              email: true,
+              candidateProfile: { select: { fullName: true } },
+            },
+          },
+        },
+      }),
+      prisma.jobPosting.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        include: {
+          recruiter: {
+            select: {
+              email: true,
+              recruiterProfile: { select: { companyName: true } },
+            },
+          },
+        },
+      }),
+    ]);
+
+    const activities: any[] = [];
+
+    recentUsers.forEach(u => {
+      const isCandidate = u.role === 'candidate';
+      const name = isCandidate ? (u.candidateProfile?.fullName || u.email) : (u.recruiterProfile?.companyName || u.email);
+      activities.push({
+        id: `user-${u.id}`,
+        type: isCandidate ? 'registration' : 'recruiter_reg',
+        user: isCandidate ? `Ứng viên ${name}` : `Doanh nghiệp ${name}`,
+        message: isCandidate ? 'đã đăng ký tài khoản ứng viên mới thành công' : 'đăng ký tài khoản doanh nghiệp mới thành công',
+        createdAt: u.createdAt,
+        badgeText: isCandidate ? 'Thành viên mới' : 'Doanh nghiệp mới',
+        badgeColor: isCandidate ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-100',
+      });
+    });
+
+    recentCvs.forEach(cv => {
+      const name = cv.user.candidateProfile?.fullName || cv.user.email;
+      activities.push({
+        id: `cv-${cv.id}`,
+        type: 'cv_created',
+        user: `Ứng viên ${name}`,
+        message: cv.cvType === 'uploaded' ? `đã tải lên CV "${cv.title}"` : `đã khởi tạo CV "${cv.title}"`,
+        createdAt: cv.createdAt,
+        badgeText: 'Tạo CV',
+        badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+      });
+    });
+
+    recentJobs.forEach(job => {
+      const name = job.recruiter.recruiterProfile?.companyName || job.recruiter.email;
+      const isPending = job.status === 'pending';
+      activities.push({
+        id: `job-${job.id}`,
+        type: isPending ? 'approval' : 'job_posted',
+        user: isPending ? `Nhà tuyển dụng ${name}` : `Doanh nghiệp ${name}`,
+        message: isPending ? `yêu cầu phê duyệt tin tuyển dụng "${job.title}"` : `đăng tin tuyển dụng mới "${job.title}" thành công`,
+        createdAt: job.createdAt,
+        badgeText: isPending ? 'Chờ duyệt' : 'Tin mới',
+        badgeColor: isPending ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-green-50 text-green-700 border-green-100',
+      });
+    });
+
+    activities.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+    return activities.slice(0, limit);
+  },
 };

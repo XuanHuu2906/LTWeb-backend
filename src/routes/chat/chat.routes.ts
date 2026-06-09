@@ -6,9 +6,11 @@ import {
   getUnreadCount,
   markMessageRead,
   sendMessage,
+  uploadAttachment,
 } from '../../controllers/chat/chat.controller';
 import { authenticate } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
+import { upload } from '../../middleware/upload';
 import {
   createConversationSchema,
   sendMessageSchema,
@@ -32,5 +34,11 @@ router.post(
   sendMessage,
 );
 router.put('/messages/:id/read', authenticate, markMessageRead);
+router.post(
+  '/conversations/:id/attachments',
+  authenticate,
+  upload.single('file'),
+  uploadAttachment,
+);
 
 export default router;

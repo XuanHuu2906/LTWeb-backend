@@ -15,6 +15,9 @@ if (!process.env.SUPABASE_URL) {
 if (!process.env.SUPABASE_ANON_KEY) {
   throw new Error('SUPABASE_ANON_KEY environment variable is required');
 }
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is required');
+}
 
 export const env = {
   port: parseInt(process.env.PORT || '3000', 10),
@@ -45,5 +48,6 @@ export const env = {
   supabase: {
     url: process.env.SUPABASE_URL,
     anonKey: process.env.SUPABASE_ANON_KEY,
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
   },
 };

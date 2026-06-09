@@ -84,7 +84,16 @@ export const candidateApplicationService = {
         deletedAt: null,
         expiresAt: { gte: new Date() },
       },
-      select: { id: true, title: true, recruiterId: true },
+      select: {
+        id: true,
+        title: true,
+        recruiterId: true,
+        recruiter: {
+          select: {
+            recruiterProfile: { select: { id: true } },
+          },
+        },
+      },
     });
 
     if (!jobPosting) {
@@ -118,6 +127,25 @@ export const candidateApplicationService = {
       application.id,
       application.jobPosting.title,
     );
+
+    const recruiterProfileId = jobPosting.recruiter.recruiterProfile?.id;
+    if (recruiterProfileId) {
+      await prisma.conversation.upsert({
+        where: {
+          candidateProfileId_recruiterProfileId_jobPostingId: {
+            candidateProfileId: candidateProfile.id,
+            recruiterProfileId,
+            jobPostingId: data.jobPostingId,
+          },
+        },
+        update: {},
+        create: {
+          candidateProfileId: candidateProfile.id,
+          recruiterProfileId,
+          jobPostingId: data.jobPostingId,
+        },
+      });
+    }
 
     return application;
   },
