@@ -414,3 +414,51 @@ model AuditLog {
 
   @@map("audit_logs")
 }
+
+model HomeFeature {
+  id          Int      @id @default(autoincrement())
+  icon        String
+  title       String
+  description String
+  highlight   String
+  color       String?
+  order       Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@index([order])
+  @@map("home_features")
+}
+
+model Testimonial {
+  id        Int      @id @default(autoincrement())
+  name      String
+  role      String
+  avatar    String?
+  content   String
+  rating    Int      @default(5) @db.SmallInt
+  order     Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@index([order])
+  @@map("testimonials")
+}
+
+model SiteMetric {
+  id        Int      @id @default(autoincrement())
+  value     String
+  label     String
+  order     Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive])
+  @@index([order])
+  @@map("site_metrics")
+}

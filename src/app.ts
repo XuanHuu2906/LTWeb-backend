@@ -31,28 +31,30 @@ const globalLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     success: false,
-    message: 'Quá nhiều yêu cầu từ IP này, vui lòng thử lại sau 15 phút',
+    message: "Quá nhiều yêu cầu từ IP này, vui lòng thử lại sau 15 phút",
   },
 });
 
 // ── Global middleware ────────────────────────────────────────────────────────
 app.use(cors({ origin: env.corsOrigin, credentials: true }));
-app.use(helmet({
-  crossOriginResourcePolicy: false, // Để cho phép hiển thị ảnh tĩnh từ domain khác ở frontend
-}));
-app.use(morgan(env.nodeEnv === 'development' ? 'dev' : 'combined'));
+app.use(
+  helmet({
+    crossOriginResourcePolicy: false, // Để cho phép hiển thị ảnh tĩnh từ domain khác ở frontend
+  }),
+);
+app.use(morgan(env.nodeEnv === "development" ? "dev" : "combined"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // ── Static Files Serving ──────────────────────────────────────────────────────
-app.use('/uploads', express.static(path.resolve(env.upload.dir)));
+app.use("/uploads", express.static(path.resolve(env.upload.dir)));
 
 // Ap dụng rate limiter toàn cục cho tất cả các api
-app.use('/api', globalLimiter);
+app.use("/api", globalLimiter);
 
 // ── Health check ─────────────────────────────────────────────────────────────
-app.get('/api/health', (_req, res) => {
-  res.json({ success: true, message: 'Server is running' });
+app.get("/api/health", (_req, res) => {
+  res.json({ success: true, message: "Server is running" });
 });
 
 
