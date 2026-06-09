@@ -8,9 +8,14 @@ import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/auth/auth.routes';
 import userAdminRoutes from './routes/users/admin.routes';
+import candidateUserRoutes from './routes/users/candidate.routes';
 import notificationRoutes from './routes/notifications/notification.routes';
 import templateRoutes from './routes/cvs/template.routes';
+import candidateCvRoutes from './routes/cvs/cv.routes';
 import jobAdminRoutes from './routes/jobs/admin.routes';
+import publicJobRoutes from './routes/jobs/public.routes';
+import candidateApplicationRoutes from './routes/applications/candidate-application.routes';
+import chatRoutes from './routes/chat/chat.routes';
 import { setupSwagger } from './config/swagger';
 
 const app = express();
@@ -52,10 +57,15 @@ app.get('/api/health', (_req, res) => {
 
 
 app.use('/api/auth', authRoutes);
+app.use('/api/users', candidateUserRoutes);
 app.use('/api/users', userAdminRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/cvs/templates', templateRoutes);
+app.use('/api/cvs', candidateCvRoutes);
 app.use('/api/jobs/admin', jobAdminRoutes);
+app.use('/api/jobs', publicJobRoutes);
+app.use('/api/applications', candidateApplicationRoutes);
+app.use('/api/chat', chatRoutes);
 
 // ── Error handler ────────────────────────────────────────────────────────────
 app.use(errorHandler);

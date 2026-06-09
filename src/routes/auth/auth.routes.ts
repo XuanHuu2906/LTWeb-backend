@@ -67,14 +67,14 @@ const authLimiter = rateLimit({
  */
 router.post(
   '/register-candidate',
-  authLimiter,
+  // authLimiter,
   validate(registerCandidateSchema),
   authController.registerCandidate
 );
 
 router.post(
   '/register-recruiter',
-  authLimiter,
+  // authLimiter,
   validate(registerRecruiterSchema),
   authController.registerRecruiter
 );
@@ -106,9 +106,9 @@ router.post(
  *       401:
  *         description: Sai email hoặc mật khẩu
  */
-router.post('/login', authLimiter, validate(loginSchema), authController.login);
+router.post('/login', /* authLimiter, */ validate(loginSchema), authController.login);
 
-router.post('/google-login', authLimiter, validate(googleLoginSchema), authController.googleLogin);
+router.post('/google-login', /* authLimiter, */ validate(googleLoginSchema), authController.googleLogin);
 
 router.post('/refresh-token', validate(refreshTokenSchema), authController.refreshToken);
 
