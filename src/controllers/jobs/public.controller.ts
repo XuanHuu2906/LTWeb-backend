@@ -1,10 +1,10 @@
-import { NextFunction, Request, Response } from 'express';
-import { AppError } from '../../middleware/errorHandler';
+import { NextFunction, Request, Response } from "express";
+import { AppError } from "../../middleware/errorHandler";
 import {
   JobFilters,
   Pagination,
   publicJobService,
-} from '../../services/jobs/public.service';
+} from "../../services/jobs/public.service";
 
 const firstQueryValue = (value: unknown) => {
   if (Array.isArray(value)) return value[0];
@@ -13,14 +13,15 @@ const firstQueryValue = (value: unknown) => {
 
 const parseStringQuery = (value: unknown) => {
   const normalized = firstQueryValue(value);
-  return typeof normalized === 'string' && normalized.trim()
+  return typeof normalized === "string" && normalized.trim()
     ? normalized.trim()
     : undefined;
 };
 
 const parseNumberQuery = (value: unknown) => {
   const normalized = firstQueryValue(value);
-  if (normalized === undefined || normalized === null || normalized === '') return undefined;
+  if (normalized === undefined || normalized === null || normalized === "")
+    return undefined;
 
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed)) return undefined;
@@ -44,19 +45,29 @@ const getFilters = (req: Request): JobFilters => {
   const categoryId = parseNumberQuery(req.query.categoryId);
 
   if (salaryMin !== undefined && salaryMin < 0) {
-    throw new AppError(400, 'salaryMin must be greater than or equal to 0');
+    throw new AppError(400, "salaryMin must be greater than or equal to 0");
   }
 
   if (salaryMax !== undefined && salaryMax < 0) {
-    throw new AppError(400, 'salaryMax must be greater than or equal to 0');
+    throw new AppError(400, "salaryMax must be greater than or equal to 0");
   }
 
-  if (salaryMin !== undefined && salaryMax !== undefined && salaryMin > salaryMax) {
-    throw new AppError(400, 'salaryMin must be less than or equal to salaryMax');
+  if (
+    salaryMin !== undefined &&
+    salaryMax !== undefined &&
+    salaryMin > salaryMax
+  ) {
+    throw new AppError(
+      400,
+      "salaryMin must be less than or equal to salaryMax",
+    );
   }
 
-  if (categoryId !== undefined && (!Number.isInteger(categoryId) || categoryId <= 0)) {
-    throw new AppError(400, 'categoryId must be a positive integer');
+  if (
+    categoryId !== undefined &&
+    (!Number.isInteger(categoryId) || categoryId <= 0)
+  ) {
+    throw new AppError(400, "categoryId must be a positive integer");
   }
 
   return {
@@ -70,13 +81,13 @@ const getFilters = (req: Request): JobFilters => {
 };
 
 const parseId = (value: string | string[] | undefined) => {
-  if (typeof value !== 'string') {
-    throw new AppError(400, 'ID việc làm không hợp lệ');
+  if (typeof value !== "string") {
+    throw new AppError(400, "ID việc làm không hợp lệ");
   }
 
   const id = Number(value);
   if (!Number.isInteger(id) || id <= 0) {
-    throw new AppError(400, 'ID việc làm không hợp lệ');
+    throw new AppError(400, "ID việc làm không hợp lệ");
   }
 
   return id;
@@ -84,21 +95,48 @@ const parseId = (value: string | string[] | undefined) => {
 
 const getCurrentUserId = (req: Request) => {
   if (!req.user?.id) {
-    throw new AppError(401, 'Unauthorized');
+    throw new AppError(401, "Unauthorized");
   }
   return req.user.id;
 };
 
-export const getJobs = async (req: Request, res: Response, next: NextFunction) => {
+export const getJobs = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
-    const result = await publicJobService.findAll(getFilters(req), getPagination(req));
+    const result = await publicJobService.findAll(
+      getFilters(req),
+      getPagination(req),
+    );
     return res.json({ success: true, data: result.items, meta: result.meta });
   } catch (error) {
     return next(error);
   }
 };
+export const getFeaturedJobs = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const limit = parsePositiveInt(req.query.limit, 6);
+    const jobs = await publicJobService.findFeatured(Math.min(limit, 12));
 
-export const searchJobs = async (req: Request, res: Response, next: NextFunction) => {
+    return res.json({
+      success: true,
+      data: jobs,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+export const searchJobs = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const result = await publicJobService.search(
       parseStringQuery(req.query.keyword),
@@ -111,7 +149,11 @@ export const searchJobs = async (req: Request, res: Response, next: NextFunction
   }
 };
 
-export const getJobById = async (req: Request, res: Response, next: NextFunction) => {
+export const getJobById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const job = await publicJobService.findById(parseId(req.params.id));
     return res.json({ success: true, data: job });
@@ -120,7 +162,11 @@ export const getJobById = async (req: Request, res: Response, next: NextFunction
   }
 };
 
-export const getCategories = async (_req: Request, res: Response, next: NextFunction) => {
+export const getCategories = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const categories = await publicJobService.findAllCategories();
     return res.json({ success: true, data: categories });
@@ -129,7 +175,11 @@ export const getCategories = async (_req: Request, res: Response, next: NextFunc
   }
 };
 
-export const getSkills = async (_req: Request, res: Response, next: NextFunction) => {
+export const getSkills = async (
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const skills = await publicJobService.findAllSkills();
     return res.json({ success: true, data: skills });
@@ -138,7 +188,11 @@ export const getSkills = async (_req: Request, res: Response, next: NextFunction
   }
 };
 
-export const getSavedJobs = async (req: Request, res: Response, next: NextFunction) => {
+export const getSavedJobs = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const result = await publicJobService.findSavedJobs(
       getCurrentUserId(req),
@@ -150,19 +204,33 @@ export const getSavedJobs = async (req: Request, res: Response, next: NextFuncti
   }
 };
 
-export const saveJob = async (req: Request, res: Response, next: NextFunction) => {
+export const saveJob = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
-    await publicJobService.createSavedJob(getCurrentUserId(req), parseId(req.params.id));
-    return res.status(201).json({ success: true, message: 'Đã lưu việc làm' });
+    await publicJobService.createSavedJob(
+      getCurrentUserId(req),
+      parseId(req.params.id),
+    );
+    return res.status(201).json({ success: true, message: "Đã lưu việc làm" });
   } catch (error) {
     return next(error);
   }
 };
 
-export const unSaveJob = async (req: Request, res: Response, next: NextFunction) => {
+export const unSaveJob = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
-    await publicJobService.removeSavedJob(getCurrentUserId(req), parseId(req.params.id));
-    return res.json({ success: true, message: 'Đã bỏ lưu việc làm' });
+    await publicJobService.removeSavedJob(
+      getCurrentUserId(req),
+      parseId(req.params.id),
+    );
+    return res.json({ success: true, message: "Đã bỏ lưu việc làm" });
   } catch (error) {
     return next(error);
   }

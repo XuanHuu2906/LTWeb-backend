@@ -1,6 +1,6 @@
-import { Prisma } from '@prisma/client';
-import { prisma } from '../../utils/prisma';
-import { AppError } from '../../middleware/errorHandler';
+import { Prisma } from "@prisma/client";
+import { prisma } from "../../utils/prisma";
+import { AppError } from "../../middleware/errorHandler";
 
 export type JobFilters = {
   location?: string;
@@ -21,15 +21,17 @@ const getPagination = ({ page, limit }: Pagination) => ({
   take: limit,
 });
 
-const buildBaseWhere = (filters: JobFilters = {}): Prisma.JobPostingWhereInput => {
+const buildBaseWhere = (
+  filters: JobFilters = {},
+): Prisma.JobPostingWhereInput => {
   const where: Prisma.JobPostingWhereInput = {
-    status: 'active',
+    status: "active",
     deletedAt: null,
     expiresAt: { gte: new Date() },
   };
 
   if (filters.location) {
-    where.location = { contains: filters.location, mode: 'insensitive' };
+    where.location = { contains: filters.location, mode: "insensitive" };
   }
 
   if (filters.jobType) {
@@ -67,7 +69,11 @@ const jobListInclude = {
   category: true,
 };
 
-const toPaginatedResult = <T>(items: T[], total: number, pagination: Pagination) => ({
+const toPaginatedResult = <T>(
+  items: T[],
+  total: number,
+  pagination: Pagination,
+) => ({
   items,
   meta: {
     total,
@@ -78,6 +84,18 @@ const toPaginatedResult = <T>(items: T[], total: number, pagination: Pagination)
 });
 
 export const publicJobService = {
+  async findFeatured(limit = 6) {
+    return prisma.jobPosting.findMany({
+      where: {
+        status: "active",
+        deletedAt: null,
+        expiresAt: { gte: new Date() },
+      },
+      include: jobListInclude,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+  },
   async findAll(filters: JobFilters, pagination: Pagination) {
     const where = buildBaseWhere(filters);
     const { skip, take } = getPagination(pagination);
@@ -86,7 +104,7 @@ export const publicJobService = {
       prisma.jobPosting.findMany({
         where,
         include: jobListInclude,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take,
       }),
@@ -96,19 +114,23 @@ export const publicJobService = {
     return toPaginatedResult(jobs, total, pagination);
   },
 
-  async search(keyword: string | undefined, filters: JobFilters, pagination: Pagination) {
+  async search(
+    keyword: string | undefined,
+    filters: JobFilters,
+    pagination: Pagination,
+  ) {
     const where = buildBaseWhere(filters);
 
     if (keyword) {
       where.OR = [
-        { title: { contains: keyword, mode: 'insensitive' } },
-        { description: { contains: keyword, mode: 'insensitive' } },
+        { title: { contains: keyword, mode: "insensitive" } },
+        { description: { contains: keyword, mode: "insensitive" } },
         {
           recruiter: {
             is: {
               recruiterProfile: {
                 is: {
-                  companyName: { contains: keyword, mode: 'insensitive' },
+                  companyName: { contains: keyword, mode: "insensitive" },
                 },
               },
             },
@@ -123,7 +145,7 @@ export const publicJobService = {
       prisma.jobPosting.findMany({
         where,
         include: jobListInclude,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip,
         take,
       }),
@@ -135,7 +157,7 @@ export const publicJobService = {
 
   async findById(id: number) {
     const job = await prisma.jobPosting.findFirst({
-      where: { id, status: 'active', deletedAt: null },
+      where: { id, status: "active", deletedAt: null },
       include: {
         recruiter: { include: { recruiterProfile: true } },
         category: true,
@@ -145,7 +167,7 @@ export const publicJobService = {
     });
 
     if (!job) {
-      throw new AppError(404, 'Việc làm không tồn tại');
+      throw new AppError(404, "Việc làm không tồn tại");
     }
 
     return job;
@@ -155,26 +177,26 @@ export const publicJobService = {
     return prisma.jobCategory.findMany({
       where: { parentId: null },
       include: { children: true },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
   },
 
   async findAllSkills() {
-    return prisma.jobSkill.findMany({ orderBy: { name: 'asc' } });
+    return prisma.jobSkill.findMany({ orderBy: { name: "asc" } });
   },
 
   async createSavedJob(userId: number, jobPostingId: number) {
     const job = await prisma.jobPosting.findFirst({
       where: {
         id: jobPostingId,
-        status: 'active',
+        status: "active",
         deletedAt: null,
         expiresAt: { gte: new Date() },
       },
     });
 
     if (!job) {
-      throw new AppError(404, 'Việc làm không tồn tại');
+      throw new AppError(404, "Việc làm không tồn tại");
     }
 
     const existing = await prisma.savedJob.findUnique({
@@ -182,7 +204,7 @@ export const publicJobService = {
     });
 
     if (existing) {
-      throw new AppError(409, 'Bạn đã lưu việc làm này');
+      throw new AppError(409, "Bạn đã lưu việc làm này");
     }
 
     return prisma.savedJob.create({ data: { userId, jobPostingId } });
@@ -213,7 +235,7 @@ export const publicJobService = {
             },
           },
         },
-        orderBy: { savedAt: 'desc' },
+        orderBy: { savedAt: "desc" },
         skip,
         take,
       }),
