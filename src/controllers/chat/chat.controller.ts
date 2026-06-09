@@ -106,6 +106,28 @@ export const sendMessage = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+export const uploadAttachment = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = getCurrentUser(req);
+
+    if (!req.file) {
+      throw new AppError(400, 'Vui lòng chọn file đính kèm');
+    }
+
+    const message = await chatService.createMessageWithAttachment(
+      parseId(req.params.id, 'ID hội thoại'),
+      user.id,
+      user.role,
+      req.file,
+      req.body.content,
+    );
+
+    return res.status(201).json({ success: true, data: message });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const markMessageRead = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = getCurrentUser(req);

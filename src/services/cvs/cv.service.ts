@@ -1,5 +1,6 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { supabaseStorageService } from '../storage/supabase-storage.service';
 
 type CVInput = {
   title?: string;
@@ -67,6 +68,18 @@ const ensureOwnership = (cv: { userId: number }, userId: number) => {
   }
 };
 
+const signCvPdfUrl = async <T extends Record<string, any> | null>(cv: T): Promise<T> => {
+  if (!cv) return cv;
+  if (cv.pdfStoragePath) {
+    try {
+      cv.pdfUrl = await supabaseStorageService.createSignedUrl(cv.pdfStoragePath, 'cvs', 600);
+    } catch (err) {
+      console.error(`Lỗi khi tạo Signed URL cho CV ${cv.id}:`, err);
+    }
+  }
+  return cv;
+};
+
 export const cvService = {
   async findAllByUserId(userId: number) {
     const cvs = await prisma.cV.findMany({
@@ -75,7 +88,8 @@ export const cvService = {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return cvs.map(parseCvJsonFields);
+    const parsedCvs = cvs.map(parseCvJsonFields);
+    return Promise.all(parsedCvs.map(signCvPdfUrl));
   },
 
   async create(userId: number, data: CVInput) {
@@ -120,7 +134,8 @@ export const cvService = {
       throw new AppError(404, 'CV không tồn tại');
     }
 
-    return parseCvJsonFields(cv);
+    const parsedCv = parseCvJsonFields(cv);
+    return signCvPdfUrl(parsedCv);
   },
 
   async update(id: number, userId: number, data: CVInput) {
@@ -132,7 +147,8 @@ export const cvService = {
       data: stringifyJsonFields(data),
     });
 
-    return parseCvJsonFields(cv);
+    const parsedCv = parseCvJsonFields(cv);
+    return signCvPdfUrl(parsedCv);
   },
 
   async delete(id: number, userId: number) {
@@ -156,17 +172,27 @@ export const cvService = {
 
     const title = file.originalname.replace(/\.pdf$/i, '') || 'CV upload';
 
-    const cv = await prisma.cV.create({
-      data: {
-        userId,
-        title,
-        cvType: 'uploaded',
-        pdfUrl: file.path,
-        status: 'active',
-      },
-    });
+    // Tải file PDF lên Supabase Storage
+    const uploadResult = await supabaseStorageService.uploadFile(file, 'cvs');
 
-    return parseCvJsonFields(cv);
+    let cv;
+    try {
+      cv = await prisma.cV.create({
+        data: {
+          userId,
+          title,
+          cvType: 'uploaded',
+          pdfStoragePath: uploadResult.storagePath,
+          status: 'active',
+        },
+      });
+    } catch (err) {
+      await supabaseStorageService.deleteFile(uploadResult.storagePath, 'cvs');
+      throw err;
+    }
+
+    const parsedCv = parseCvJsonFields(cv);
+    return signCvPdfUrl(parsedCv);
   },
 
   async updateStatus(id: number, userId: number, status: 'draft' | 'active') {
@@ -189,6 +215,7 @@ export const cvService = {
       data: { status },
     });
 
-    return parseCvJsonFields(cv);
+    const parsedCv = parseCvJsonFields(cv);
+    return signCvPdfUrl(parsedCv);
   },
 };

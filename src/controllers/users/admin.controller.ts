@@ -55,10 +55,23 @@ export const deleteUser = async (req: Request, res: Response) => {
   res.json(messageResponse('Xóa tài khoản thành công'));
 };
 
+export const getDashboardStats = async (req: Request, res: Response) => {
+  const stats = await userAdminService.getStats();
+  res.json(successResponse(stats, 'Lấy thông tin dashboard thành công'));
+};
+
+export const getSystemActivities = async (req: Request, res: Response) => {
+  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
+  const activities = await userAdminService.getSystemActivities(limit);
+  res.json(successResponse(activities, 'Lấy nhật ký hệ thống thành công'));
+};
+
 export const userAdminController = {
   getUsers,
   getUserById,
   updateUser,
   toggleUserStatus,
   deleteUser,
+  getDashboardStats,
+  getSystemActivities,
 };

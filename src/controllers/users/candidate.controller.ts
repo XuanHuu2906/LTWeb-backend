@@ -1,23 +1,25 @@
-import { NextFunction, Request, Response } from 'express';
-import { AppError } from '../../middleware/errorHandler';
-import { candidateProfileService } from '../../services/users/candidate-profile.service';
+import { NextFunction, Request, Response } from "express";
+import { AppError } from "../../middleware/errorHandler";
+import { candidateProfileService } from "../../services/users/candidate-profile.service";
+import { supabaseStorageService } from "../../services/storage/supabase-storage.service";
+import prisma from "../../config/database";
 
 const getCurrentUserId = (req: Request) => {
   if (!req.user?.id) {
-    throw new AppError(401, 'Unauthorized');
+    throw new AppError(401, "Unauthorized");
   }
   return req.user.id;
 };
 
 const parseDateOfBirth = (value: unknown) => {
-  if (value === undefined || value === null || value === '') return undefined;
-  if (typeof value !== 'string') {
-    throw new AppError(400, 'dateOfBirth không hợp lệ');
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string") {
+    throw new AppError(400, "dateOfBirth không hợp lệ");
   }
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
-    throw new AppError(400, 'dateOfBirth không hợp lệ');
+    throw new AppError(400, "dateOfBirth không hợp lệ");
   }
 
   return parsed;
@@ -29,7 +31,9 @@ export const getCandidateProfile = async (
   next: NextFunction,
 ) => {
   try {
-    const profile = await candidateProfileService.findByUserId(getCurrentUserId(req));
+    const profile = await candidateProfileService.findByUserId(
+      getCurrentUserId(req),
+    );
     return res.json({ success: true, data: profile });
   } catch (error) {
     return next(error);
@@ -60,17 +64,27 @@ export const updateCandidateProfile = async (
   }
 };
 
-export const uploadAvatar = async (req: Request, res: Response, next: NextFunction) => {
+export const uploadAvatar = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
   try {
     const userId = getCurrentUserId(req);
 
     if (!req.file) {
-      throw new AppError(400, 'Vui lòng chọn file avatar');
+      throw new AppError(400, "Vui lòng chọn file avatar");
     }
 
-    const avatarUrl = await candidateProfileService.updateAvatar(userId, req.file.path);
+    const uploadResult = await supabaseStorageService.uploadFile(req.file, "avatars");
 
-    return res.json({ success: true, data: { avatarUrl } });
+    const profile = await prisma.candidateProfile.update({
+      where: { userId },
+      data: { avatarUrl: uploadResult.publicUrl || null },
+      select: { avatarUrl: true },
+    });
+
+    return res.json({ success: true, data: { avatarUrl: profile.avatarUrl } });
   } catch (error) {
     return next(error);
   }
