@@ -13,6 +13,7 @@ import candidateUserRoutes from './routes/users/candidate.routes';
 import notificationRoutes from './routes/notifications/notification.routes';
 import templateRoutes from './routes/cvs/template.routes';
 import candidateCvRoutes from './routes/cvs/cv.routes';
+import homeRoutes from './routes/home/home.routes';
 import jobAdminRoutes from './routes/jobs/admin.routes';
 import userCandidateRoutes from './routes/users/candidate.routes';
 import userRecruiterRoutes from './routes/users/recruiter.routes';
@@ -21,6 +22,7 @@ import jobRecruiterRoutes from './routes/jobs/recruiter.routes';
 import applicationCandidateRoutes from './routes/applications/candidate-application.routes';
 import applicationRecruiterRoutes from './routes/applications/recruiter.routes';
 import cvRoutes from './routes/cvs/cv.routes';
+import chatRoutes from './routes/chat/chat.routes';
 import { setupSwagger } from './config/swagger';
 import { authenticate } from './middleware/auth';
 
@@ -69,6 +71,7 @@ app.get("/api/health", (_req, res) => {
 
 
 app.use('/api/auth', authRoutes);
+app.use('/api/home', homeRoutes);
 app.use('/api/users', candidateUserRoutes);
 app.use('/api/users', userAdminRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -82,6 +85,7 @@ app.use('/api/cvs', cvRoutes);
 // Các route /my, /drafts, POST /, PUT /:id... sẽ được chuyển tiếp sang recruiter routes bên dưới.
 app.use('/api/jobs', jobPublicRoutes);
 app.use('/api/jobs', jobRecruiterRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Module applications có route GET /:id cho cả candidate và recruiter.
 // Nếu mount tuần tự bình thường, một role sẽ bị route của role còn lại bắt nhầm.

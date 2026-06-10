@@ -84,7 +84,10 @@ export const uploadAvatar = async (
       throw new AppError(400, "Vui lòng chọn file avatar");
     }
 
-    const uploadResult = await supabaseStorageService.uploadFile(req.file, "avatars");
+    const uploadResult = await supabaseStorageService.uploadFile(
+      req.file,
+      "avatars",
+    );
 
     const profile = await prisma.candidateProfile.update({
       where: { userId },
