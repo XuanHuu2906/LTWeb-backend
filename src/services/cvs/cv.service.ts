@@ -144,7 +144,8 @@ export const cvService = {
       throw new AppError(404, 'CV không tồn tại');
     }
 
-    return parseCvJsonFields(cv);
+    const parsedCv = parseCvJsonFields(cv);
+    return signCvPdfUrl(parsedCv);
   },
 
   async update(id: number, userId: number, data: CVInput) {
@@ -183,15 +184,24 @@ export const cvService = {
 
     const title = getPdfTitle(file.originalname);
 
-    const cv = await prisma.cV.create({
-      data: {
-        userId,
-        title,
-        cvType: 'uploaded',
-        pdfUrl: `/uploads/${file.filename}`,
-        status: 'active',
-      },
-    });
+    // Tải file PDF lên Supabase Storage
+    const uploadResult = await supabaseStorageService.uploadFile(file, 'cvs');
+
+    let cv;
+    try {
+      cv = await prisma.cV.create({
+        data: {
+          userId,
+          title,
+          cvType: 'uploaded',
+          pdfStoragePath: uploadResult.storagePath,
+          status: 'active',
+        },
+      });
+    } catch (err) {
+      await supabaseStorageService.deleteFile(uploadResult.storagePath, 'cvs');
+      throw err;
+    }
 
     await invalidateUserCvCache(userId);
     return parseCvJsonFields(cv);

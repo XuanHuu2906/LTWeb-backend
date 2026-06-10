@@ -11,6 +11,10 @@ router.use(authenticate, authorize('admin'));
 
 router.get('/', userAdminController.getUsers);
 
+router.get('/dashboard/stats', userAdminController.getDashboardStats);
+
+router.get('/dashboard/activities', userAdminController.getSystemActivities);
+
 router.get('/:id', userAdminController.getUserById);
 
 router.put('/:id', validate(adminUpdateUserSchema), userAdminController.updateUser);
