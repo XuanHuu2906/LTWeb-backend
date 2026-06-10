@@ -6,6 +6,7 @@ import path from 'path';
 import rateLimit from 'express-rate-limit';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
+import { createRedisRateLimitStore } from './utils/redis-rate-limit-store';
 import authRoutes from './routes/auth/auth.routes';
 import userAdminRoutes from './routes/users/admin.routes';
 import candidateUserRoutes from './routes/users/candidate.routes';
@@ -32,6 +33,8 @@ setupSwagger(app as any);
 const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 phút
   max: 100, // Tối đa 100 requests từ mỗi IP
+  store: createRedisRateLimitStore('rate-limit:global'),
+  passOnStoreError: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
