@@ -8,21 +8,23 @@ const getCurrentUserId = (req: Request) => {
   if (!req.user?.id) {
     throw new AppError(401, "Unauthorized");
   }
+
   return req.user.id;
 };
 
 const parseDateOfBirth = (value: unknown) => {
   if (value === undefined || value === null || value === "") return undefined;
+
   if (typeof value !== "string") {
     throw new AppError(400, "dateOfBirth không hợp lệ");
   }
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
     throw new AppError(400, "dateOfBirth không hợp lệ");
   }
 
-  return parsed;
+  return parsedDate;
 };
 
 export const getCandidateProfile = async (
@@ -31,10 +33,13 @@ export const getCandidateProfile = async (
   next: NextFunction,
 ) => {
   try {
-    const profile = await candidateProfileService.findByUserId(
-      getCurrentUserId(req),
-    );
-    return res.json({ success: true, data: profile });
+    const userId = getCurrentUserId(req);
+    const profile = await candidateProfileService.findByUserId(userId);
+
+    return res.json({
+      success: true,
+      data: profile,
+    });
   } catch (error) {
     return next(error);
   }
@@ -58,7 +63,10 @@ export const updateCandidateProfile = async (
       bio,
     });
 
-    return res.json({ success: true, data: profile });
+    return res.json({
+      success: true,
+      data: profile,
+    });
   } catch (error) {
     return next(error);
   }
@@ -84,7 +92,10 @@ export const uploadAvatar = async (
       select: { avatarUrl: true },
     });
 
-    return res.json({ success: true, data: { avatarUrl: profile.avatarUrl } });
+    return res.json({
+      success: true,
+      data: { avatarUrl },
+    });
   } catch (error) {
     return next(error);
   }

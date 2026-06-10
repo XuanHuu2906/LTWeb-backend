@@ -55,7 +55,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.resolve(env.upload.dir)));
 
 // Ap dụng rate limiter toàn cục cho tất cả các api
-app.use("/api", globalLimiter);
+if (env.nodeEnv !== "development") {
+  app.use("/api", globalLimiter);
+}
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {
