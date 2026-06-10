@@ -2,7 +2,22 @@ import { prisma } from "../../utils/prisma";
 
 export const homeService = {
   async getHomeContent() {
-    const [features, testimonials, metrics] = await Promise.all([
+    const now = new Date();
+    const activeJobWhere = {
+      status: "active",
+      deletedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
+    };
+
+    const [
+      features,
+      testimonials,
+      metrics,
+      activeJobs,
+      recruiters,
+      candidates,
+      locations,
+    ] = await Promise.all([
       prisma.homeFeature.findMany({
         where: { isActive: true },
         orderBy: { order: "asc" },
@@ -15,9 +30,33 @@ export const homeService = {
         where: { isActive: true },
         orderBy: { order: "asc" },
       }),
+      prisma.jobPosting.count({
+        where: activeJobWhere,
+      }),
+      prisma.user.count({
+        where: { role: "recruiter", status: "active", deletedAt: null },
+      }),
+      prisma.user.count({
+        where: { role: "candidate", status: "active", deletedAt: null },
+      }),
+      prisma.jobPosting.findMany({
+        where: { ...activeJobWhere, location: { not: null } },
+        distinct: ["location"],
+        select: { location: true },
+      }),
     ]);
 
-    return { features, testimonials, metrics };
+    return {
+      features,
+      testimonials,
+      metrics,
+      systemStats: {
+        activeJobs,
+        recruiters,
+        candidates,
+        locations: locations.length,
+      },
+    };
   },
 
   async getTestimonials(page: number, limit: number) {
