@@ -1,6 +1,7 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { cache } from '../../utils/cache';
+import { supabaseStorageService } from '../storage/supabase-storage.service';
 
 type CVInput = {
   title?: string;
@@ -66,6 +67,12 @@ const ensureOwnership = (cv: { userId: number }, userId: number) => {
   if (cv.userId !== userId) {
     throw new AppError(403, 'Bạn không có quyền thao tác CV này');
   }
+};
+
+const cvListCacheKey = (userId: number) => `candidate:${userId}:cvs`;
+
+const invalidateUserCvCache = async (userId: number) => {
+  await cache.delByPattern(`candidate:${userId}:cvs*`);
 };
 
 const normalizeUploadedFileName = (fileName: string) => {

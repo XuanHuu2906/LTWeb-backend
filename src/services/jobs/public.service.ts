@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { AppError } from "../../middleware/errorHandler";
-import { getOrSetCache } from "../../utils/cache";
+import { cache, getOrSetCache } from "../../utils/cache";
 
 export type JobFilters = {
   location?: string;
