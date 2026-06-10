@@ -44,8 +44,14 @@ export const validate = (schema: ZodSchema | ValidationSchemaObject) => {
               .join("; ");
             throw new AppError(400, errorMessages);
           }
-          // Assign parsed and coerced data back to request target
-          req[target] = result.data as any;
+          // Express exposes req.query as a getter in some versions, so do not
+          // replace it directly. Mutating the existing object keeps validation
+          // results available without crashing at runtime.
+          if (target === "query") {
+            Object.assign(req.query, result.data);
+          } else {
+            req[target] = result.data as any;
+          }
         }
       }
     }

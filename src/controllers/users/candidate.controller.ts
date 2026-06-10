@@ -1,27 +1,28 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../../middleware/errorHandler";
 import { candidateProfileService } from "../../services/users/candidate-profile.service";
-import prisma from "../../config/database";
 
 const getCurrentUserId = (req: Request) => {
   if (!req.user?.id) {
     throw new AppError(401, "Unauthorized");
   }
+
   return req.user.id;
 };
 
 const parseDateOfBirth = (value: unknown) => {
   if (value === undefined || value === null || value === "") return undefined;
+
   if (typeof value !== "string") {
     throw new AppError(400, "dateOfBirth không hợp lệ");
   }
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) {
     throw new AppError(400, "dateOfBirth không hợp lệ");
   }
 
-  return parsed;
+  return parsedDate;
 };
 
 export const getCandidateProfile = async (
@@ -30,10 +31,13 @@ export const getCandidateProfile = async (
   next: NextFunction,
 ) => {
   try {
-    const profile = await candidateProfileService.findByUserId(
-      getCurrentUserId(req),
-    );
-    return res.json({ success: true, data: profile });
+    const userId = getCurrentUserId(req);
+    const profile = await candidateProfileService.findByUserId(userId);
+
+    return res.json({
+      success: true,
+      data: profile,
+    });
   } catch (error) {
     return next(error);
   }
@@ -57,7 +61,10 @@ export const updateCandidateProfile = async (
       bio,
     });
 
-    return res.json({ success: true, data: profile });
+    return res.json({
+      success: true,
+      data: profile,
+    });
   } catch (error) {
     return next(error);
   }
@@ -75,13 +82,15 @@ export const uploadAvatar = async (
       throw new AppError(400, "Vui lòng chọn file avatar");
     }
 
-    const profile = await prisma.candidateProfile.update({
-      where: { userId },
-      data: { avatarUrl: `/uploads/${req.file.filename}` },
-      select: { avatarUrl: true },
-    });
+    const avatarUrl = await candidateProfileService.updateAvatar(
+      userId,
+      `/uploads/${req.file.filename}`,
+    );
 
-    return res.json({ success: true, data: { avatarUrl: profile.avatarUrl } });
+    return res.json({
+      success: true,
+      data: { avatarUrl },
+    });
   } catch (error) {
     return next(error);
   }

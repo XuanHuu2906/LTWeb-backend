@@ -1,5 +1,6 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { cache } from '../../utils/cache';
 
 type CVInput = {
   title?: string;
@@ -67,15 +68,37 @@ const ensureOwnership = (cv: { userId: number }, userId: number) => {
   }
 };
 
+const cvListCacheKey = (userId: number) => `candidate:${userId}:cvs`;
+
+const decodeOriginalFileName = (fileName: string) => {
+  const normalized = Buffer.from(fileName, 'latin1').toString('utf8');
+  return normalized.includes('�') ? fileName : normalized;
+};
+
+const getPdfTitle = (fileName: string) => {
+  const decodedName = decodeOriginalFileName(fileName);
+  return decodedName.replace(/\.pdf$/i, '').trim() || 'CV upload';
+};
+
+const invalidateUserCvCache = async (userId: number) => {
+  await cache.del(cvListCacheKey(userId));
+};
+
 export const cvService = {
   async findAllByUserId(userId: number) {
+    const cacheKey = cvListCacheKey(userId);
+    const cached = await cache.getJson<unknown[]>(cacheKey);
+    if (cached) return cached;
+
     const cvs = await prisma.cV.findMany({
       where: { userId, deletedAt: null },
       include: { template: { select: { name: true, thumbnailUrl: true } } },
       orderBy: { updatedAt: 'desc' },
     });
 
-    return cvs.map(parseCvJsonFields);
+    const result = cvs.map(parseCvJsonFields);
+    await cache.setJson(cacheKey, result, 300);
+    return result;
   },
 
   async create(userId: number, data: CVInput) {
@@ -107,6 +130,7 @@ export const cvService = {
       },
     });
 
+    await invalidateUserCvCache(userId);
     return parseCvJsonFields(cv);
   },
 
@@ -132,6 +156,7 @@ export const cvService = {
       data: stringifyJsonFields(data),
     });
 
+    await invalidateUserCvCache(userId);
     return parseCvJsonFields(cv);
   },
 
@@ -143,6 +168,8 @@ export const cvService = {
       where: { id },
       data: { deletedAt: new Date() },
     });
+
+    await invalidateUserCvCache(userId);
   },
 
   async uploadPdf(userId: number, file?: Express.Multer.File) {
@@ -154,7 +181,7 @@ export const cvService = {
       throw new AppError(400, 'File upload phải là PDF');
     }
 
-    const title = file.originalname.replace(/\.pdf$/i, '') || 'CV upload';
+    const title = getPdfTitle(file.originalname);
 
     const cv = await prisma.cV.create({
       data: {
@@ -166,6 +193,7 @@ export const cvService = {
       },
     });
 
+    await invalidateUserCvCache(userId);
     return parseCvJsonFields(cv);
   },
 
@@ -189,6 +217,7 @@ export const cvService = {
       data: { status },
     });
 
+    await invalidateUserCvCache(userId);
     return parseCvJsonFields(cv);
   },
 };

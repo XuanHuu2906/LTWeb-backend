@@ -8,8 +8,12 @@ import { env } from "./config/env";
 import { errorHandler } from "./middleware/errorHandler";
 import authRoutes from "./routes/auth/auth.routes";
 import userAdminRoutes from "./routes/users/admin.routes";
+import candidateUserRoutes from "./routes/users/candidate.routes";
+import candidateApplicationRoutes from "./routes/applications/candidate-application.routes";
 import notificationRoutes from "./routes/notifications/notification.routes";
 import templateRoutes from "./routes/cvs/template.routes";
+import cvRoutes from "./routes/cvs/cv.routes";
+import chatRoutes from "./routes/chat/chat.routes";
 import jobAdminRoutes from "./routes/jobs/admin.routes";
 import { setupSwagger } from "./config/swagger";
 import publicJobRoutes from "./routes/jobs/public.routes";
@@ -46,7 +50,9 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(path.resolve(env.upload.dir)));
 
 // Ap dụng rate limiter toàn cục cho tất cả các api
-app.use("/api", globalLimiter);
+if (env.nodeEnv !== "development") {
+  app.use("/api", globalLimiter);
+}
 
 // ── Health check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (_req, res) => {
@@ -54,9 +60,13 @@ app.get("/api/health", (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/users", candidateUserRoutes);
 app.use("/api/users", userAdminRoutes);
+app.use("/api/applications", candidateApplicationRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/cvs/templates", templateRoutes);
+app.use("/api/cvs", cvRoutes);
+app.use("/api/chat", chatRoutes);
 app.use("/api/home", homeRoutes);
 app.use("/api/jobs/admin", jobAdminRoutes);
 app.use("/api/jobs", publicJobRoutes);

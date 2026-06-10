@@ -5,17 +5,22 @@ import {
   Pagination,
   publicJobService,
 } from "../../services/jobs/public.service";
+import { success } from "zod";
 
 const firstQueryValue = (value: unknown) => {
-  if (Array.isArray(value)) return value[0];
+  const isArray = Array.isArray(value);
+  if (isArray) {
+    return value[0];
+  }
   return value;
 };
 
 const parseStringQuery = (value: unknown) => {
-  const normalized = firstQueryValue(value);
-  return typeof normalized === "string" && normalized.trim()
-    ? normalized.trim()
-    : undefined;
+  const firtValue = firstQueryValue(value);
+  if (typeof firtValue !== "string") return undefined;
+  const trimmed = firtValue.trim();
+  if (trimmed === "") return undefined;
+  return trimmed;
 };
 
 const parseNumberQuery = (value: unknown) => {
@@ -27,29 +32,38 @@ const parseNumberQuery = (value: unknown) => {
   if (!Number.isFinite(parsed)) return undefined;
   return parsed;
 };
-
+// Doc so nguyen duong tu query string, tra ve fallback neu khong hop le
 const parsePositiveInt = (value: unknown, fallback: number) => {
-  const parsed = parseNumberQuery(value);
-  if (!parsed || !Number.isInteger(parsed) || parsed <= 0) return fallback;
-  return parsed;
+  const numberValue = parseNumberQuery(value);
+  if (numberValue === undefined) return fallback;
+  if (!Number.isInteger(numberValue) || numberValue <= 0) {
+    return fallback;
+  }
+  return numberValue;
 };
-
-const getPagination = (req: Request): Pagination => ({
-  page: parsePositiveInt(req.query.page, 1),
-  limit: Math.min(parsePositiveInt(req.query.limit, 10), 100),
-});
-
+// Lay pagination tu query string, tra ve page = 1 va limit = 10 neu khong hop le hoac khong ton tai
+const getPagination = (req: Request): Pagination => {
+  const page = parsePositiveInt(req.query.page, 1);
+  const rawlimit = parsePositiveInt(req.query.limit, 10);
+  const limit = Math.min(rawlimit, 100);
+  return { page, limit };
+};
+// Lay filters tu query string, tra ve object JobFilters. Neu co tham so khong hop le thi throw AppError 400
 const getFilters = (req: Request): JobFilters => {
+  const location = parseStringQuery(req.query.location);
+  const jobType = parseStringQuery(req.query.jobType);
+  const experienceLevel = parseStringQuery(req.query.experienceLevel);
+
   const salaryMin = parseNumberQuery(req.query.salaryMin);
   const salaryMax = parseNumberQuery(req.query.salaryMax);
   const categoryId = parseNumberQuery(req.query.categoryId);
 
   if (salaryMin !== undefined && salaryMin < 0) {
-    throw new AppError(400, "salaryMin must be greater than or equal to 0");
+    throw new AppError(400, "salaryMin không được nhỏ hơn 0");
   }
 
   if (salaryMax !== undefined && salaryMax < 0) {
-    throw new AppError(400, "salaryMax must be greater than or equal to 0");
+    throw new AppError(400, "salaryMax không được nhỏ hơn 0");
   }
 
   if (
@@ -57,23 +71,22 @@ const getFilters = (req: Request): JobFilters => {
     salaryMax !== undefined &&
     salaryMin > salaryMax
   ) {
-    throw new AppError(
-      400,
-      "salaryMin must be less than or equal to salaryMax",
-    );
+    throw new AppError(400, "salaryMin không được lớn hơn salaryMax");
   }
 
-  if (
-    categoryId !== undefined &&
-    (!Number.isInteger(categoryId) || categoryId <= 0)
-  ) {
-    throw new AppError(400, "categoryId must be a positive integer");
+  if (categoryId !== undefined) {
+    const isInvalidCategoryId =
+      !Number.isInteger(categoryId) || categoryId <= 0;
+
+    if (isInvalidCategoryId) {
+      throw new AppError(400, "categoryId phải là số nguyên dương");
+    }
   }
 
   return {
-    location: parseStringQuery(req.query.location),
-    jobType: parseStringQuery(req.query.jobType),
-    experienceLevel: parseStringQuery(req.query.experienceLevel),
+    location,
+    jobType,
+    experienceLevel,
     categoryId,
     salaryMin,
     salaryMax,
@@ -86,7 +99,10 @@ const parseId = (value: string | string[] | undefined) => {
   }
 
   const id = Number(value);
-  if (!Number.isInteger(id) || id <= 0) {
+
+  const isInvalidId = !Number.isInteger(id) || id <= 0;
+
+  if (isInvalidId) {
     throw new AppError(400, "ID việc làm không hợp lệ");
   }
 
@@ -94,10 +110,17 @@ const parseId = (value: string | string[] | undefined) => {
 };
 
 const getCurrentUserId = (req: Request) => {
-  if (!req.user?.id) {
-    throw new AppError(401, "Unauthorized");
+  const currentUser = req.user;
+
+  if (!currentUser) {
+    throw new AppError(401, "Bạn cần đăng nhập");
   }
-  return req.user.id;
+
+  if (!currentUser.id) {
+    throw new AppError(401, "Bạn cần đăng nhập");
+  }
+
+  return currentUser.id;
 };
 
 export const getJobs = async (
@@ -106,10 +129,9 @@ export const getJobs = async (
   next: NextFunction,
 ) => {
   try {
-    const result = await publicJobService.findAll(
-      getFilters(req),
-      getPagination(req),
-    );
+    const filters = getFilters(req);
+    const pagination = getPagination(req);
+    const result = await publicJobService.findAll(filters, pagination);
     return res.json({ success: true, data: result.items, meta: result.meta });
   } catch (error) {
     return next(error);
