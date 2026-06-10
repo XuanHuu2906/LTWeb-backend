@@ -94,7 +94,7 @@ export const uploadAvatar = async (
 
     return res.json({
       success: true,
-      data: { avatarUrl },
+      data: { avatarUrl: profile.avatarUrl },
     });
   } catch (error) {
     return next(error);

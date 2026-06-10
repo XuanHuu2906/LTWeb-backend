@@ -1,8 +1,28 @@
+import { Prisma } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import fs from 'fs';
 import path from 'path';
 import { env } from '../../config/env';
+
+type CandidateProfileInput = {
+  fullName: string;
+  phone?: string | null;
+  address?: string | null;
+  dateOfBirth?: Date | null;
+  bio?: string | null;
+};
+
+const candidateProfileInclude = {
+  user: {
+    select: {
+      id: true,
+      email: true,
+      role: true,
+      status: true,
+    },
+  },
+} satisfies Prisma.CandidateProfileInclude;
 
 const normalizeAvatarUrl = (avatarUrl?: string | null) => {
   if (!avatarUrl?.startsWith('/uploads/')) return avatarUrl;
