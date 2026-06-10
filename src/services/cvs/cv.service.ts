@@ -1,6 +1,6 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
-import { supabaseStorageService } from '../storage/supabase-storage.service';
+import { cache } from '../../utils/cache';
 
 type CVInput = {
   title?: string;
@@ -91,14 +91,19 @@ const signCvPdfUrl = async <T extends Record<string, any> | null>(cv: T): Promis
 
 export const cvService = {
   async findAllByUserId(userId: number) {
+    const cacheKey = cvListCacheKey(userId);
+    const cached = await cache.getJson<unknown[]>(cacheKey);
+    if (cached) return cached;
+
     const cvs = await prisma.cV.findMany({
       where: { userId, deletedAt: null },
       include: { template: { select: { name: true, thumbnailUrl: true } } },
       orderBy: { updatedAt: 'desc' },
     });
 
-    const parsedCvs = cvs.map(parseCvJsonFields);
-    return Promise.all(parsedCvs.map(signCvPdfUrl));
+    const result = cvs.map(parseCvJsonFields);
+    await cache.setJson(cacheKey, result, 300);
+    return result;
   },
 
   async create(userId: number, data: CVInput) {
@@ -130,6 +135,7 @@ export const cvService = {
       },
     });
 
+    await invalidateUserCvCache(userId);
     return parseCvJsonFields(cv);
   },
 
@@ -156,8 +162,8 @@ export const cvService = {
       data: stringifyJsonFields(data),
     });
 
-    const parsedCv = parseCvJsonFields(cv);
-    return signCvPdfUrl(parsedCv);
+    await invalidateUserCvCache(userId);
+    return parseCvJsonFields(cv);
   },
 
   async delete(id: number, userId: number) {
@@ -168,6 +174,8 @@ export const cvService = {
       where: { id },
       data: { deletedAt: new Date() },
     });
+
+    await invalidateUserCvCache(userId);
   },
 
   async uploadPdf(userId: number, file?: Express.Multer.File) {
@@ -202,8 +210,8 @@ export const cvService = {
       throw err;
     }
 
-    const parsedCv = parseCvJsonFields(cv);
-    return signCvPdfUrl(parsedCv);
+    await invalidateUserCvCache(userId);
+    return parseCvJsonFields(cv);
   },
 
   async updateStatus(id: number, userId: number, status: 'draft' | 'active') {
@@ -226,7 +234,7 @@ export const cvService = {
       data: { status },
     });
 
-    const parsedCv = parseCvJsonFields(cv);
-    return signCvPdfUrl(parsedCv);
+    await invalidateUserCvCache(userId);
+    return parseCvJsonFields(cv);
   },
 };

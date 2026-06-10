@@ -16,10 +16,11 @@ export const candidateProfileService = {
   async findByUserId(userId: number) {
     const profile = await prisma.candidateProfile.findUnique({
       where: { userId },
+      include: candidateProfileInclude,
     });
 
     if (!profile) {
-      throw new AppError(404, 'Hồ sơ ứng viên không tồn tại');
+      throw new AppError(404, "Hồ sơ ứng viên không tồn tại");
     }
 
     return {
@@ -28,18 +29,10 @@ export const candidateProfileService = {
     };
   },
 
-  async upsert(
-    userId: number,
-    data: {
-      fullName: string;
-      phone?: string | null;
-      address?: string | null;
-      dateOfBirth?: Date | null;
-      bio?: string | null;
-    },
-  ) {
+  async upsert(userId: number, data: CandidateProfileInput) {
     const { fullName, phone, address, dateOfBirth, bio } = data;
-    return await prisma.candidateProfile.upsert({
+
+    return prisma.candidateProfile.upsert({
       where: { userId },
       create: {
         userId,
@@ -56,10 +49,13 @@ export const candidateProfileService = {
         dateOfBirth,
         bio,
       },
+      include: candidateProfileInclude,
     });
   },
 
   async updateAvatar(userId: number, filePath: string) {
+    await this.findByUserId(userId);
+
     const profile = await prisma.candidateProfile.update({
       where: { userId },
       data: { avatarUrl: filePath },

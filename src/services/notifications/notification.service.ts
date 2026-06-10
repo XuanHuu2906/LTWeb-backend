@@ -1,7 +1,5 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
-import { sendEmail } from '../../utils/email';
-import { addEmailJob } from '../../utils/email.queue';
 
 // ── Find All (paginated) ────────────────────────────────────────────────────
 export const findAll = async (
@@ -78,11 +76,6 @@ export const queueEmail = async (
 ) => {
   const email = await prisma.emailQueue.create({
     data: { userId, toEmail, subject, bodyHtml, status: 'pending' },
-  });
-
-  // Gửi email bất đồng bộ thông qua hàng đợi BullMQ + Redis
-  addEmailJob(email.id).catch((err) => {
-    console.error(`[BullMQ] Không thể thêm email ID ${email.id} vào hàng đợi:`, err);
   });
 
   return email;
