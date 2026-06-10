@@ -1,5 +1,16 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import fs from 'fs';
+import path from 'path';
+import { env } from '../../config/env';
+
+const normalizeAvatarUrl = (avatarUrl?: string | null) => {
+  if (!avatarUrl?.startsWith('/uploads/')) return avatarUrl;
+
+  const relativePath = avatarUrl.replace(/^\/uploads\//, '');
+  const absolutePath = path.resolve(env.upload.dir, relativePath);
+  return fs.existsSync(absolutePath) ? avatarUrl : null;
+};
 
 export const candidateProfileService = {
   async findByUserId(userId: number) {
@@ -11,7 +22,10 @@ export const candidateProfileService = {
       throw new AppError(404, 'Hồ sơ ứng viên không tồn tại');
     }
 
-    return profile;
+    return {
+      ...profile,
+      avatarUrl: normalizeAvatarUrl(profile.avatarUrl),
+    };
   },
 
   async upsert(

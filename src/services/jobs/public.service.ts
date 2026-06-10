@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { AppError } from "../../middleware/errorHandler";
+import { getOrSetCache } from "../../utils/cache";
 
 export type JobFilters = {
   location?: string;
@@ -174,15 +175,19 @@ export const publicJobService = {
   },
 
   async findAllCategories() {
-    return prisma.jobCategory.findMany({
-      where: { parentId: null },
-      include: { children: true },
-      orderBy: { name: "asc" },
-    });
+    return getOrSetCache("jobs:categories", 60 * 60, () =>
+      prisma.jobCategory.findMany({
+        where: { parentId: null },
+        include: { children: true },
+        orderBy: { name: "asc" },
+      }),
+    );
   },
 
   async findAllSkills() {
-    return prisma.jobSkill.findMany({ orderBy: { name: "asc" } });
+    return getOrSetCache("jobs:skills", 60 * 60, () =>
+      prisma.jobSkill.findMany({ orderBy: { name: "asc" } }),
+    );
   },
 
   async createSavedJob(userId: number, jobPostingId: number) {

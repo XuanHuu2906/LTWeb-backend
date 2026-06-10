@@ -1,23 +1,33 @@
 import { Queue, Worker } from 'bullmq';
-import { env } from '../config/env';
 import { sendEmail } from './email';
 import { prisma } from './prisma';
+import { redisConnectionOptions } from './redis';
 
-const connection = {
-  host: env.redis.host,
-  port: env.redis.port,
-  password: env.redis.password,
+const emailJobOptions = {
+  attempts: 3,
+  backoff: {
+    type: 'exponential' as const,
+    delay: 5000,
+  },
+  removeOnComplete: {
+    age: 24 * 60 * 60,
+    count: 1000,
+  },
+  removeOnFail: {
+    age: 7 * 24 * 60 * 60,
+    count: 5000,
+  },
 };
 
-export const emailQueue = new Queue('emailQueue', { connection });
+export const emailQueue = new Queue('emailQueue', {
+  connection: redisConnectionOptions,
+  defaultJobOptions: emailJobOptions,
+});
 
 export const addEmailJob = async (emailId: number) => {
   await emailQueue.add('send', { emailId }, {
-    attempts: 3,
-    backoff: {
-      type: 'exponential',
-      delay: 5000, // 5s, 10s, 20s...
-    },
+    ...emailJobOptions,
+    jobId: `email:${emailId}`,
   });
 };
 
@@ -52,7 +62,10 @@ export const startEmailWorker = () => {
       });
       throw err;
     }
-  }, { connection });
+  }, {
+    connection: redisConnectionOptions,
+    concurrency: 5,
+  });
 
   worker.on('completed', (job) => {
     console.log(`[BullMQ] Gửi email thành công cho Job ID: ${job.id}`);

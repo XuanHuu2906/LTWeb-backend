@@ -8,6 +8,24 @@ export interface ValidationSchemaObject {
   params?: ZodSchema;
 }
 
+const assignValidatedData = (
+  req: Request,
+  target: "body" | "query" | "params",
+  data: unknown,
+) => {
+  if (target === "query") {
+    Object.defineProperty(req, "query", {
+      value: data,
+      writable: true,
+      configurable: true,
+      enumerable: true,
+    });
+    return;
+  }
+
+  req[target] = data as any;
+};
+
 export const validate = (schema: ZodSchema | ValidationSchemaObject) => {
   return (req: Request, _res: Response, next: NextFunction) => {
     if ("safeParse" in schema) {
@@ -45,7 +63,7 @@ export const validate = (schema: ZodSchema | ValidationSchemaObject) => {
             throw new AppError(400, errorMessages);
           }
           // Assign parsed and coerced data back to request target
-          req[target] = result.data as any;
+          assignValidatedData(req, target, result.data);
         }
       }
     }

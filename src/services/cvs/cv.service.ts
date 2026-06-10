@@ -68,6 +68,15 @@ const ensureOwnership = (cv: { userId: number }, userId: number) => {
   }
 };
 
+const normalizeUploadedFileName = (fileName: string) => {
+  try {
+    const decodedFileName = Buffer.from(fileName, 'latin1').toString('utf8');
+    return decodedFileName.includes('�') ? fileName : decodedFileName;
+  } catch {
+    return fileName;
+  }
+};
+
 const signCvPdfUrl = async <T extends Record<string, any> | null>(cv: T): Promise<T> => {
   if (!cv) return cv;
   if (cv.pdfStoragePath) {
@@ -170,7 +179,9 @@ export const cvService = {
       throw new AppError(400, 'File upload phải là PDF');
     }
 
-    const title = file.originalname.replace(/\.pdf$/i, '') || 'CV upload';
+    const title =
+      normalizeUploadedFileName(file.originalname).replace(/\.pdf$/i, '') ||
+      'CV upload';
 
     // Tải file PDF lên Supabase Storage
     const uploadResult = await supabaseStorageService.uploadFile(file, 'cvs');
