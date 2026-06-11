@@ -1,31 +1,49 @@
-import { NextFunction, Request, Response, Router } from 'express';
+import { Router } from 'express';
 import {
-  getCategories,
-  getJobById,
-  getJobs,
-  getSavedJobs,
-  getSkills,
-  saveJob,
-  searchJobs,
-  unSaveJob,
-} from '../../controllers/jobs/public.controller';
-import { authenticate } from '../../middleware/auth';
+  createJob,
+  deleteJob,
+  getDraftJobs,
+  getMyJobDetail,
+  getMyJobs,
+  updateJob,
+  updateJobStatus,
+} from '../../controllers/jobs/recruiter.controller';
+import { authenticate, authorize } from '../../middleware/auth';
+import { validate } from '../../middleware/validate';
+import {
+  createJobSchema,
+  updateJobSchema,
+  updateJobStatusSchema,
+} from '../../validations/jobs/recruiter.validation';
 
 const router = Router();
 
-const ensureNumericId = (req: Request, _res: Response, next: NextFunction) => {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) return next('route');
-  return next();
-};
+const recruiterOnly = [authenticate, authorize('recruiter')];
 
-router.get('/', getJobs);
-router.get('/search', searchJobs);
-router.get('/categories', getCategories);
-router.get('/skills', getSkills);
-router.get('/saved', authenticate, getSavedJobs);
-router.get('/:id', ensureNumericId, getJobById);
-router.post('/:id/save', ensureNumericId, authenticate, saveJob);
-router.delete('/:id/save', ensureNumericId, authenticate, unSaveJob);
+// GET /api/jobs/my
+router.get('/my', recruiterOnly, getMyJobs);
+
+// GET /api/jobs/drafts
+router.get('/drafts', recruiterOnly, getDraftJobs);
+
+// GET /api/jobs/:id/recruiter
+router.get('/:id/recruiter', recruiterOnly, getMyJobDetail);
+
+// POST /api/jobs
+router.post('/', recruiterOnly, validate(createJobSchema), createJob);
+
+// PUT /api/jobs/:id
+router.put('/:id', recruiterOnly, validate(updateJobSchema), updateJob);
+
+// PATCH /api/jobs/:id/status
+router.patch(
+  '/:id/status',
+  recruiterOnly,
+  validate(updateJobStatusSchema),
+  updateJobStatus,
+);
+
+// DELETE /api/jobs/:id
+router.delete('/:id', recruiterOnly, deleteJob);
 
 export default router;

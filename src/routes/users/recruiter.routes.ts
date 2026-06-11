@@ -13,8 +13,17 @@ const router = Router();
 
 router.use(authenticate, authorize('recruiter'));
 
-router.get('/recruiter/profile', getRecruiterProfile);
-router.put('/recruiter/profile', validate(updateRecruiterProfileSchema), updateRecruiterProfile);
-router.post('/recruiter/logo', upload.single('logo'), uploadLogo);
+// GET /api/users/recruiter/profile
+router.get('/profile', getRecruiterProfile);
+
+// PUT /api/users/recruiter/profile
+router.put(
+  '/profile',
+  validate(updateRecruiterProfileSchema),
+  updateRecruiterProfile,
+);
+
+// POST /api/users/recruiter/logo
+router.post('/logo', upload.single('logo'), uploadLogo);
 
 export default router;
