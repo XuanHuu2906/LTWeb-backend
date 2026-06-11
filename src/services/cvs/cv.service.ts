@@ -1,7 +1,7 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { cache } from '../../utils/cache';
-import { supabaseStorageService } from '../storage/supabase-storage.service';
+import { storageService } from '../storage/storage.service';
 
 type CVInput = {
   title?: string;
@@ -88,7 +88,7 @@ const signCvPdfUrl = async <T extends Record<string, any> | null>(cv: T): Promis
   if (!cv) return cv;
   if (cv.pdfStoragePath) {
     try {
-      cv.pdfUrl = await supabaseStorageService.createSignedUrl(cv.pdfStoragePath, 'cvs', 600);
+      cv.pdfUrl = await storageService.createSignedUrl(cv.pdfStoragePath, 'cvs', 600);
     } catch (err) {
       console.error(`Lỗi khi tạo Signed URL cho CV ${cv.id}:`, err);
     }
@@ -199,7 +199,7 @@ export const cvService = {
       'CV upload';
 
     // Tải file PDF lên Supabase Storage
-    const uploadResult = await supabaseStorageService.uploadFile(file, 'cvs');
+    const uploadResult = await storageService.uploadFile(file, 'cvs');
 
     let cv;
     try {
@@ -213,7 +213,7 @@ export const cvService = {
         },
       });
     } catch (err) {
-      await supabaseStorageService.deleteFile(uploadResult.storagePath, 'cvs');
+      await storageService.deleteFile(uploadResult.storagePath, 'cvs');
       throw err;
     }
 

@@ -29,8 +29,15 @@ export const uploadLogo = async (req: Request, res: Response, next: NextFunction
   try {
     if (!req.file) throw new AppError(400, 'Vui lòng chọn file logo');
 
-    const logoUrl = await recruiterProfileService.updateLogo(getCurrentUserId(req), req.file.path);
-    return res.json({ success: true, data: { logoUrl }, message: 'Cập nhật logo thành công' });
+    const profile = await recruiterProfileService.replaceLogo(getCurrentUserId(req), req.file);
+    return res.json({
+      success: true,
+      data: {
+        logoUrl: profile.logoUrl,
+        logoStoragePath: profile.logoStoragePath,
+      },
+      message: 'Cập nhật logo thành công',
+    });
   } catch (error) {
     return next(error);
   }

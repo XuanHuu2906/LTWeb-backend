@@ -1,7 +1,7 @@
 import { UserRole } from '../../types/enums';
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
-import { supabaseStorageService } from '../storage/supabase-storage.service';
+import { storageService } from '../storage/storage.service';
 
 type Pagination = {
   page: number;
@@ -193,7 +193,7 @@ export const chatService = {
       messages.map(async (msg: any) => {
         if (msg.messageType === 'file' && msg.attachmentPath) {
           try {
-            msg.attachmentUrl = await supabaseStorageService.createSignedUrl(
+            msg.attachmentUrl = await storageService.createSignedUrl(
               msg.attachmentPath,
               'chat-files',
               600,
@@ -245,7 +245,7 @@ export const chatService = {
     await findConversationForUser(conversationId, senderId, role);
 
     // Upload attachment to private bucket 'chat-files'
-    const uploadResult = await supabaseStorageService.uploadFile(file, 'chat-files');
+    const uploadResult = await storageService.uploadFile(file, 'chat-files');
 
     let message;
     try {
@@ -272,7 +272,7 @@ export const chatService = {
         return createdMessage;
       });
     } catch (err) {
-      await supabaseStorageService.deleteFile(uploadResult.storagePath, 'chat-files');
+      await storageService.deleteFile(uploadResult.storagePath, 'chat-files');
       throw err;
     }
 
@@ -280,7 +280,7 @@ export const chatService = {
 
     // Generate signed URL for immediate preview/download
     try {
-      const signedUrl = await supabaseStorageService.createSignedUrl(
+      const signedUrl = await storageService.createSignedUrl(
         uploadResult.storagePath,
         'chat-files',
         600,

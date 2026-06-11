@@ -17,7 +17,6 @@ import notificationRoutes from './routes/notifications/notification.routes';
 import chatRoutes from './routes/chat/chat.routes';
 
 import templateRoutes from './routes/cvs/template.routes';
-import candidateCvRoutes from './routes/cvs/cv.routes';
 import cvRoutes from './routes/cvs/cv.routes';
 
 import homeRoutes from './routes/home/home.routes';
@@ -28,8 +27,6 @@ import jobPublicRoutes from './routes/jobs/public.routes';
 import applicationCandidateRoutes from './routes/applications/candidate-application.routes';
 import applicationRecruiterRoutes from './routes/applications/recruiter.routes';
 
-import cvRoutes from './routes/cvs/cv.routes';
-import chatRoutes from './routes/chat/chat.routes';
 import { setupSwagger } from './config/swagger';
 import { authenticate } from './middleware/auth';
 
@@ -81,14 +78,12 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users/candidate', userCandidateRoutes);
 app.use('/api/users/recruiter', userRecruiterRoutes);
 app.use('/api/home', homeRoutes);
-app.use('/api/users', candidateUserRoutes);
 app.use('/api/users', userAdminRoutes);
 
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/chat', chatRoutes);
 
 app.use('/api/cvs/templates', templateRoutes);
-app.use('/api/cvs', candidateCvRoutes);
 app.use('/api/cvs', cvRoutes);
 
 app.use('/api/jobs/admin', jobAdminRoutes);
@@ -100,7 +95,6 @@ app.use('/api/jobs/admin', jobAdminRoutes);
  */
 app.use('/api/jobs', jobRecruiterRoutes);
 app.use('/api/jobs', jobPublicRoutes);
-app.use('/api/chat', chatRoutes);
 
 /**
  * Application routes
