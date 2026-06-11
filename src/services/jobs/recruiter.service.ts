@@ -16,6 +16,7 @@ type JobInput = {
   categoryId?: number | null;
   expiresAt?: string | null;
   skillIds?: number[];
+  status?: string;
 };
 
 type Pagination = {
@@ -98,7 +99,7 @@ export const recruiterJobService = {
         experienceLevel: data.experienceLevel ?? null,
         categoryId: data.categoryId ?? null,
         expiresAt: toDateOrNull(data.expiresAt),
-        status: 'active',
+        status: data.status === 'draft' ? 'draft' : 'active',
       },
     });
 
@@ -205,8 +206,8 @@ export const recruiterJobService = {
       throw new AppError(400, 'Trạng thái chỉ được là active hoặc closed');
     }
 
-    if (!['active', 'closed'].includes(job.status)) {
-      throw new AppError(400, 'Chỉ được chuyển trạng thái giữa active và closed');
+    if (!['draft', 'active', 'closed'].includes(job.status)) {
+      throw new AppError(400, 'Chỉ được chuyển trạng thái giữa draft, active và closed');
     }
 
     return prisma.jobPosting.update({

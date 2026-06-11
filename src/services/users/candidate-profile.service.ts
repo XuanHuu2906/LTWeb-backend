@@ -4,6 +4,7 @@ import { AppError } from '../../middleware/errorHandler';
 import fs from 'fs';
 import path from 'path';
 import { env } from '../../config/env';
+import { storageService } from '../storage/storage.service';
 
 type CandidateProfileInput = {
   fullName: string;
@@ -83,5 +84,46 @@ export const candidateProfileService = {
     });
 
     return profile.avatarUrl;
+  },
+
+  async replaceAvatar(userId: number, file: Express.Multer.File) {
+    const existing = await prisma.candidateProfile.findUnique({
+      where: { userId },
+      select: { avatarStoragePath: true },
+    });
+
+    if (!existing) {
+      storageService.cleanupTempFile(file.path);
+      throw new AppError(404, "Há»“ sÆ¡ á»©ng viĂªn khĂ´ng tá»“n táº¡i");
+    }
+
+    const uploadResult = await storageService.uploadFile(file, 'avatars');
+
+    let profile;
+    try {
+      profile = await prisma.candidateProfile.update({
+        where: { userId },
+        data: {
+          avatarUrl: uploadResult.publicUrl || null,
+          avatarStoragePath: uploadResult.storagePath,
+        },
+        select: {
+          avatarUrl: true,
+          avatarStoragePath: true,
+        },
+      });
+    } catch (error) {
+      await storageService.deleteFile(uploadResult.storagePath, 'avatars');
+      throw error;
+    }
+
+    if (
+      existing.avatarStoragePath &&
+      existing.avatarStoragePath !== uploadResult.storagePath
+    ) {
+      await storageService.deleteFile(existing.avatarStoragePath, 'avatars');
+    }
+
+    return profile;
   },
 };
