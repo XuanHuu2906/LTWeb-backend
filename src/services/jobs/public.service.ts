@@ -1,7 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { AppError } from "../../middleware/errorHandler";
-import { cache } from "../../utils/cache";
+import { cache, getOrSetCache } from "../../utils/cache";
+
 export type JobFilters = {
   location?: string;
   jobType?: string;
@@ -329,39 +330,20 @@ export const publicJobService = {
 
   // Lấy danh sách ngành nghề
   async findAllCategories() {
-    const cached = await cache.getJson<unknown[]>("jobs:categories");
-    if (cached) return cached;
-
-    const categories = await prisma.jobCategory.findMany({
-      // Chỉ lấy category cha
-      where: {
-        parentId: null,
-      },
-
-      // Lấy luôn category con
-      include: {
-        children: true,
-      },
-
-      // Sắp xếp theo tên A-Z
-      orderBy: {
-        name: "asc",
-      },
-    });
-
-    await cache.setJson("jobs:categories", categories, 300);
-    return categories;
+    return getOrSetCache("jobs:categories", 60 * 60, () =>
+      prisma.jobCategory.findMany({
+        where: { parentId: null },
+        include: { children: true },
+        orderBy: { name: "asc" },
+      }),
+    );
   },
 
   // Lấy danh sách kỹ năng
   async findAllSkills() {
-    const skills = await prisma.jobSkill.findMany({
-      orderBy: {
-        name: "asc",
-      },
-    });
-
-    return skills;
+    return getOrSetCache("jobs:skills", 60 * 60, () =>
+      prisma.jobSkill.findMany({ orderBy: { name: "asc" } }),
+    );
   },
 
   async createSavedJob(userId: number, jobPostingId: number) {

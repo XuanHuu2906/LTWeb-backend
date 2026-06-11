@@ -3,6 +3,7 @@ import rateLimit from 'express-rate-limit';
 import { authController } from '../../controllers/auth/auth.controller';
 import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/auth';
+import { createRedisRateLimitStore } from '../../utils/redis-rate-limit-store';
 import {
   registerCandidateSchema,
   registerRecruiterSchema,
@@ -21,6 +22,8 @@ const router = Router();
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 phút
   max: 5,
+  store: createRedisRateLimitStore('rate-limit:auth'),
+  passOnStoreError: true,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -67,14 +70,14 @@ const authLimiter = rateLimit({
  */
 router.post(
   '/register-candidate',
-  // authLimiter,
+  authLimiter,
   validate(registerCandidateSchema),
   authController.registerCandidate
 );
 
 router.post(
   '/register-recruiter',
-  // authLimiter,
+  authLimiter,
   validate(registerRecruiterSchema),
   authController.registerRecruiter
 );
@@ -106,14 +109,14 @@ router.post(
  *       401:
  *         description: Sai email hoặc mật khẩu
  */
-router.post('/login', /* authLimiter, */ validate(loginSchema), authController.login);
+router.post('/login', authLimiter, validate(loginSchema), authController.login);
 
-router.post('/google-login', /* authLimiter, */ validate(googleLoginSchema), authController.googleLogin);
+router.post('/google-login', authLimiter, validate(googleLoginSchema), authController.googleLogin);
 
 router.post('/refresh-token', validate(refreshTokenSchema), authController.refreshToken);
 
 
-router.post('/forgot-password', validate(forgotPasswordSchema), authController.forgotPassword);
+router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), authController.forgotPassword);
 
 router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
 

@@ -254,7 +254,7 @@ export const chatService = {
           data: {
             conversationId,
             senderId,
-            content: content?.trim() || null,
+            content: content?.trim() || '',
             messageType: 'file',
             attachmentPath: uploadResult.storagePath,
             attachmentName: file.originalname,

@@ -1,5 +1,9 @@
-import { AppError } from "../../middleware/errorHandler";
-import { prisma } from "../../utils/prisma";
+import { Prisma } from '@prisma/client';
+import { prisma } from '../../utils/prisma';
+import { AppError } from '../../middleware/errorHandler';
+import fs from 'fs';
+import path from 'path';
+import { env } from '../../config/env';
 
 type CandidateProfileInput = {
   fullName: string;
@@ -18,6 +22,14 @@ const candidateProfileInclude = {
       status: true,
     },
   },
+} satisfies Prisma.CandidateProfileInclude;
+
+const normalizeAvatarUrl = (avatarUrl?: string | null) => {
+  if (!avatarUrl?.startsWith('/uploads/')) return avatarUrl;
+
+  const relativePath = avatarUrl.replace(/^\/uploads\//, '');
+  const absolutePath = path.resolve(env.upload.dir, relativePath);
+  return fs.existsSync(absolutePath) ? avatarUrl : null;
 };
 
 export const candidateProfileService = {
@@ -31,7 +43,10 @@ export const candidateProfileService = {
       throw new AppError(404, "Hồ sơ ứng viên không tồn tại");
     }
 
-    return profile;
+    return {
+      ...profile,
+      avatarUrl: normalizeAvatarUrl(profile.avatarUrl),
+    };
   },
 
   async upsert(userId: number, data: CandidateProfileInput) {

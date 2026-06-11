@@ -1,6 +1,7 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { cache } from '../../utils/cache';
+import { supabaseStorageService } from '../storage/supabase-storage.service';
 
 type CVInput = {
   title?: string;
@@ -70,18 +71,29 @@ const ensureOwnership = (cv: { userId: number }, userId: number) => {
 
 const cvListCacheKey = (userId: number) => `candidate:${userId}:cvs`;
 
-const decodeOriginalFileName = (fileName: string) => {
-  const normalized = Buffer.from(fileName, 'latin1').toString('utf8');
-  return normalized.includes('�') ? fileName : normalized;
-};
-
-const getPdfTitle = (fileName: string) => {
-  const decodedName = decodeOriginalFileName(fileName);
-  return decodedName.replace(/\.pdf$/i, '').trim() || 'CV upload';
-};
-
 const invalidateUserCvCache = async (userId: number) => {
-  await cache.del(cvListCacheKey(userId));
+  await cache.delByPattern(`candidate:${userId}:cvs*`);
+};
+
+const normalizeUploadedFileName = (fileName: string) => {
+  try {
+    const decodedFileName = Buffer.from(fileName, 'latin1').toString('utf8');
+    return decodedFileName.includes('�') ? fileName : decodedFileName;
+  } catch {
+    return fileName;
+  }
+};
+
+const signCvPdfUrl = async <T extends Record<string, any> | null>(cv: T): Promise<T> => {
+  if (!cv) return cv;
+  if (cv.pdfStoragePath) {
+    try {
+      cv.pdfUrl = await supabaseStorageService.createSignedUrl(cv.pdfStoragePath, 'cvs', 600);
+    } catch (err) {
+      console.error(`Lỗi khi tạo Signed URL cho CV ${cv.id}:`, err);
+    }
+  }
+  return cv;
 };
 
 export const cvService = {
@@ -182,7 +194,9 @@ export const cvService = {
       throw new AppError(400, 'File upload phải là PDF');
     }
 
-    const title = getPdfTitle(file.originalname);
+    const title =
+      normalizeUploadedFileName(file.originalname).replace(/\.pdf$/i, '') ||
+      'CV upload';
 
     // Tải file PDF lên Supabase Storage
     const uploadResult = await supabaseStorageService.uploadFile(file, 'cvs');

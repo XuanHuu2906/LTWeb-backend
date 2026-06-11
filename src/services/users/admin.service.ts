@@ -218,7 +218,11 @@ export const userAdminService = {
         where: { deletedAt: null },
         orderBy: { createdAt: 'desc' },
         take: 5,
-        include: {
+        select: {
+          id: true,
+          title: true,
+          cvType: true,
+          createdAt: true,
           user: {
             select: {
               email: true,
@@ -326,7 +330,11 @@ export const userAdminService = {
         where: { deletedAt: null },
         orderBy: { createdAt: 'desc' },
         take: limit,
-        include: {
+        select: {
+          id: true,
+          title: true,
+          cvType: true,
+          createdAt: true,
           user: {
             select: {
               email: true,
