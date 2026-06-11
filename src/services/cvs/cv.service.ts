@@ -203,14 +203,21 @@ export const cvService = {
 
     let cv;
     try {
-      cv = await prisma.cV.create({
-        data: {
-          userId,
-          title,
-          cvType: 'uploaded',
-          pdfStoragePath: uploadResult.storagePath,
-          status: 'active',
-        },
+      cv = await prisma.$transaction(async (tx) => {
+        await tx.cV.updateMany({
+          where: { userId, deletedAt: null, status: 'active' },
+          data: { status: 'draft' },
+        });
+
+        return tx.cV.create({
+          data: {
+            userId,
+            title,
+            cvType: 'uploaded',
+            pdfStoragePath: uploadResult.storagePath,
+            status: 'active',
+          },
+        });
       });
     } catch (err) {
       await storageService.deleteFile(uploadResult.storagePath, 'cvs');
