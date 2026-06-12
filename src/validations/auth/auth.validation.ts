@@ -24,6 +24,9 @@ export const registerRecruiterSchema = z.object({
     .min(1, 'là bắt buộc')
     .max(200, 'không được vượt quá 200 ký tự'),
   contactName: z.string().max(100, 'không được vượt quá 100 ký tự').optional().nullable(),
+  phone: z.string().max(30, 'không được vượt quá 30 ký tự').optional().nullable(),
+  website: z.string().max(255, 'không được vượt quá 255 ký tự').optional().nullable(),
+  description: z.string().max(5000, 'không được vượt quá 5000 ký tự').optional().nullable(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Xác nhận mật khẩu phải trùng khớp với mật khẩu',
   path: ['confirmPassword'],
