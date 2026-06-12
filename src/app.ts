@@ -23,6 +23,7 @@ import homeRoutes from './routes/home/home.routes';
 import jobAdminRoutes from './routes/jobs/admin.routes';
 import jobRecruiterRoutes from './routes/jobs/recruiter.routes';
 import jobPublicRoutes from './routes/jobs/public.routes';
+import companyPublicRoutes from './routes/companies/public.routes';
 
 import applicationCandidateRoutes from './routes/applications/candidate-application.routes';
 import applicationRecruiterRoutes from './routes/applications/recruiter.routes';
@@ -95,6 +96,7 @@ app.use('/api/jobs/admin', jobAdminRoutes);
  */
 app.use('/api/jobs', jobRecruiterRoutes);
 app.use('/api/jobs', jobPublicRoutes);
+app.use('/api/companies', companyPublicRoutes);
 
 /**
  * Application routes
