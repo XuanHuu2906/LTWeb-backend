@@ -41,6 +41,22 @@ const toDateOrNull = (value?: string | null) => {
   return parsed;
 };
 
+const startOfToday = () => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+};
+
+const ensureActiveExpiry = (expiresAt: Date | null) => {
+  if (!expiresAt) {
+    throw new AppError(400, 'Hạn nộp hồ sơ là bắt buộc với tin đang hoạt động');
+  }
+
+  if (expiresAt < startOfToday()) {
+    throw new AppError(400, 'Hạn nộp hồ sơ không được ở quá khứ');
+  }
+};
+
 const buildJobData = (data: JobInput): Prisma.JobPostingUncheckedUpdateInput => {
   const result: Prisma.JobPostingUncheckedUpdateInput = {};
 
@@ -84,6 +100,10 @@ const toPaginatedResult = <T>(items: T[], total: number, pagination: Pagination)
 
 export const recruiterJobService = {
   async create(recruiterId: number, data: JobInput) {
+    const status = data.status === 'draft' ? 'draft' : 'active';
+    const expiresAt = toDateOrNull(data.expiresAt);
+    if (status === 'active') ensureActiveExpiry(expiresAt);
+
     const job = await prisma.jobPosting.create({
       data: {
         recruiterId,
@@ -98,8 +118,8 @@ export const recruiterJobService = {
         jobType: data.jobType!,
         experienceLevel: data.experienceLevel ?? null,
         categoryId: data.categoryId ?? null,
-        expiresAt: toDateOrNull(data.expiresAt),
-        status: data.status === 'draft' ? 'draft' : 'active',
+        expiresAt,
+        status,
       },
     });
 
@@ -156,7 +176,13 @@ export const recruiterJobService = {
   },
 
   async update(id: number, recruiterId: number, data: JobInput) {
-    await ensureOwnJob(id, recruiterId);
+    const existingJob = await ensureOwnJob(id, recruiterId);
+    if (existingJob.status === 'active') {
+      const nextExpiresAt =
+        data.expiresAt !== undefined ? toDateOrNull(data.expiresAt) : existingJob.expiresAt;
+      ensureActiveExpiry(nextExpiresAt);
+    }
+
     const { skillIds, ...jobDataInput } = data;
     const jobData = buildJobData(jobDataInput);
 
@@ -208,6 +234,10 @@ export const recruiterJobService = {
 
     if (!['draft', 'active', 'closed'].includes(job.status)) {
       throw new AppError(400, 'Chỉ được chuyển trạng thái giữa draft, active và closed');
+    }
+
+    if (status === 'active') {
+      ensureActiveExpiry(job.expiresAt);
     }
 
     return prisma.jobPosting.update({

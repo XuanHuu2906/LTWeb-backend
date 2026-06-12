@@ -1,5 +1,6 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { addEmailJob } from '../../utils/email.queue';
 
 // ── Find All (paginated) ────────────────────────────────────────────────────
 export const findAll = async (
@@ -77,6 +78,7 @@ export const queueEmail = async (
   const email = await prisma.emailQueue.create({
     data: { userId, toEmail, subject, bodyHtml, status: 'pending' },
   });
+  await addEmailJob(email.id);
 
   return email;
 };
