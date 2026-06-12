@@ -13,6 +13,26 @@ const getPagination = ({ page, limit }: Pagination) => ({
   take: limit,
 });
 
+const normalizeUploadedFileName = (fileName: string) => {
+  try {
+    const decodedFileName = Buffer.from(fileName, 'latin1').toString('utf8');
+    return decodedFileName.includes('\uFFFD') ? fileName : decodedFileName;
+  } catch {
+    return fileName;
+  }
+};
+
+const applicationInclude = {
+  candidateProfile: { include: { user: { select: { id: true, email: true, createdAt: true } } } },
+  cv: { select: { title: true, cvType: true, pdfUrl: true } },
+  jobPosting: { select: { id: true, title: true, recruiterId: true } },
+  feedbacks: {
+    include: { recruiterProfile: { select: { companyName: true } } },
+    orderBy: { createdAt: 'desc' as const },
+  },
+  evaluations: true,
+};
+
 const getCandidateProfile = async (userId: number) => {
   const profile = await prisma.candidateProfile.findUnique({ where: { userId } });
   if (!profile) throw new AppError(404, 'Hồ sơ ứng viên không tồn tại');
@@ -89,7 +109,7 @@ export const chatService = {
   async findConversations(userId: number, role: UserRole) {
     const where = await getUserConversationWhere(userId, role);
 
-    return prisma.conversation.findMany({
+    const conversations = await prisma.conversation.findMany({
       where,
       include: {
         candidateProfile: { select: { fullName: true, avatarUrl: true } },
@@ -103,6 +123,59 @@ export const chatService = {
         },
       },
       orderBy: { updatedAt: 'desc' },
+    });
+
+    if (role !== 'recruiter') return conversations;
+
+    const conversationsWithJob = conversations.filter((conversation) => conversation.jobPostingId);
+    if (conversationsWithJob.length === 0) {
+      return conversations.map((conversation) => ({ ...conversation, application: null }));
+    }
+
+    const applications = await prisma.application.findMany({
+      where: {
+        deletedAt: null,
+        OR: conversationsWithJob.map((conversation) => ({
+          candidateProfileId: conversation.candidateProfileId,
+          jobPostingId: conversation.jobPostingId!,
+        })),
+      },
+      include: applicationInclude,
+    });
+
+    const applicationByConversationKey = new Map(
+      applications.map((application) => [
+        `${application.candidateProfileId}:${application.jobPostingId}`,
+        application,
+      ]),
+    );
+
+    return conversations.map((conversation) => ({
+      ...conversation,
+      application: conversation.jobPostingId
+        ? applicationByConversationKey.get(`${conversation.candidateProfileId}:${conversation.jobPostingId}`) ?? null
+        : null,
+    }));
+  },
+
+  async findConversationApplications(conversationId: number, userId: number, role: UserRole) {
+    if (role !== 'recruiter') {
+      throw new AppError(403, 'Chỉ nhà tuyển dụng mới có quyền xem hồ sơ ứng tuyển trong chat');
+    }
+
+    const conversation = await findConversationForUser(conversationId, userId, role);
+
+    return prisma.application.findMany({
+      where: {
+        candidateProfileId: conversation.candidateProfileId,
+        deletedAt: null,
+        jobPosting: {
+          recruiterId: userId,
+          deletedAt: null,
+        },
+      },
+      include: applicationInclude,
+      orderBy: { appliedAt: 'desc' },
     });
   },
 
@@ -257,7 +330,7 @@ export const chatService = {
             content: content?.trim() || '',
             messageType: 'file',
             attachmentPath: uploadResult.storagePath,
-            attachmentName: file.originalname,
+            attachmentName: normalizeUploadedFileName(file.originalname),
             attachmentMime: file.mimetype,
             attachmentSize: file.size,
           },

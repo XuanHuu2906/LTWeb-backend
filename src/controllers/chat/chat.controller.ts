@@ -90,6 +90,21 @@ export const getMessages = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+export const getConversationApplications = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = getCurrentUser(req);
+    const applications = await chatService.findConversationApplications(
+      parseId(req.params.id, 'ID hội thoại'),
+      user.id,
+      user.role,
+    );
+
+    return res.json({ success: true, data: applications });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const sendMessage = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = getCurrentUser(req);

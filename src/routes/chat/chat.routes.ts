@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   createConversation,
   getConversations,
+  getConversationApplications,
   getMessages,
   getUnreadCount,
   markMessageRead,
@@ -26,6 +27,7 @@ router.post(
   createConversation,
 );
 router.get('/conversations/unread-count', authenticate, getUnreadCount);
+router.get('/conversations/:id/applications', authenticate, getConversationApplications);
 router.get('/conversations/:id/messages', authenticate, getMessages);
 router.post(
   '/conversations/:id/messages',
