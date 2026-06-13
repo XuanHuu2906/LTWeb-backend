@@ -111,6 +111,7 @@ export const recruiterApplicationService = {
             include: { user: { select: { email: true } } },
           },
           cv: { select: { title: true, cvType: true, pdfUrl: true } },
+          jobPosting: { select: { id: true, title: true } },
         },
         orderBy: { appliedAt: 'desc' },
         skip: pagination.skip,
