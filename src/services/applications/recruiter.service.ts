@@ -120,6 +120,7 @@ export const recruiterApplicationService = {
             include: { user: { select: { email: true } } },
           },
           cv: { select: { title: true, cvType: true, pdfUrl: true } },
+          jobPosting: { select: { id: true, title: true, recruiterId: true } },
           feedbacks: {
             include: { recruiterProfile: { select: { companyName: true } } },
             orderBy: { createdAt: 'desc' },
