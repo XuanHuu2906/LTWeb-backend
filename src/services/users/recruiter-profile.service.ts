@@ -1,5 +1,6 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { storageService } from '../storage/storage.service';
 
 type RecruiterProfileInput = {
   companyName: string;
@@ -44,13 +45,44 @@ export const recruiterProfileService = {
     });
   },
 
-  async updateLogo(userId: number, filePath: string) {
-    const profile = await prisma.recruiterProfile.update({
+  async replaceLogo(userId: number, file: Express.Multer.File) {
+    const existing = await prisma.recruiterProfile.findUnique({
       where: { userId },
-      data: { logoUrl: filePath },
-      select: { logoUrl: true },
+      select: { logoStoragePath: true },
     });
 
-    return profile.logoUrl;
+    if (!existing) {
+      storageService.cleanupTempFile(file.path);
+      throw new AppError(404, 'Há»“ sÆ¡ nhĂ  tuyá»ƒn dá»¥ng khĂ´ng tá»“n táº¡i');
+    }
+
+    const uploadResult = await storageService.uploadFile(file, 'company-logos');
+
+    let profile;
+    try {
+      profile = await prisma.recruiterProfile.update({
+        where: { userId },
+        data: {
+          logoUrl: uploadResult.publicUrl || null,
+          logoStoragePath: uploadResult.storagePath,
+        },
+        select: {
+          logoUrl: true,
+          logoStoragePath: true,
+        },
+      });
+    } catch (error) {
+      await storageService.deleteFile(uploadResult.storagePath, 'company-logos');
+      throw error;
+    }
+
+    if (
+      existing.logoStoragePath &&
+      existing.logoStoragePath !== uploadResult.storagePath
+    ) {
+      await storageService.deleteFile(existing.logoStoragePath, 'company-logos');
+    }
+
+    return profile;
   },
 };

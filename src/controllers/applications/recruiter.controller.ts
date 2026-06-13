@@ -86,6 +86,7 @@ export const createFeedback = async (req: Request, res: Response, next: NextFunc
       parseId(req.params.id, 'ID đơn ứng tuyển'),
       getCurrentUserId(req),
       req.body.content,
+      req.body.status,
     );
     return res.status(201).json({ success: true, data: feedback, message: 'Gửi phản hồi thành công' });
   } catch (error) {

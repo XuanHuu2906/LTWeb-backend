@@ -60,13 +60,21 @@ const findOwnedApplication = async (applicationId: number, recruiterId: number) 
 
 const validateStatusTransition = (currentStatus: string, nextStatus: string) => {
   const allowed: Record<string, string[]> = {
-    pending: ['reviewing'],
-    reviewing: ['accepted', 'rejected'],
+    pending: ['reviewing', 'interview', 'accepted', 'rejected'],
+    reviewing: ['interview', 'accepted', 'rejected'],
+    interview: ['accepted', 'rejected'],
   };
 
   if (!allowed[currentStatus]?.includes(nextStatus)) {
     throw new AppError(400, `Không thể chuyển trạng thái từ ${currentStatus} sang ${nextStatus}`);
   }
+};
+
+const statusLabel: Record<string, string> = {
+  reviewing: 'Đang xem xét',
+  interview: 'Mời phỏng vấn',
+  accepted: 'Phù hợp',
+  rejected: 'Không phù hợp',
 };
 
 const notifyCandidate = async (
@@ -96,6 +104,7 @@ export const recruiterApplicationService = {
     statusFilter?: string,
   ) {
     await ensureOwnJob(jobPostingId, recruiterId);
+    const recruiterProfile = await getRecruiterProfile(recruiterId);
 
     const where: Prisma.ApplicationWhereInput = {
       jobPostingId,
@@ -111,7 +120,11 @@ export const recruiterApplicationService = {
             include: { user: { select: { email: true } } },
           },
           cv: { select: { title: true, cvType: true, pdfUrl: true } },
-          jobPosting: { select: { id: true, title: true } },
+          feedbacks: {
+            include: { recruiterProfile: { select: { companyName: true } } },
+            orderBy: { createdAt: 'desc' },
+          },
+          evaluations: true,
         },
         orderBy: { appliedAt: 'desc' },
         skip: pagination.skip,
@@ -120,11 +133,41 @@ export const recruiterApplicationService = {
       prisma.application.count({ where }),
     ]);
 
-    return toPaginatedResult(applications, total, pagination);
+    const conversations = await prisma.conversation.findMany({
+      where: {
+        jobPostingId,
+        recruiterProfileId: recruiterProfile.id,
+        candidateProfileId: { in: applications.map((application) => application.candidateProfileId) },
+      },
+      select: { id: true, candidateProfileId: true },
+    });
+    const conversationByCandidate = new Map(
+      conversations.map((conversation) => [conversation.candidateProfileId, conversation]),
+    );
+
+    return toPaginatedResult(
+      applications.map((application) => ({
+        ...application,
+        conversation: conversationByCandidate.get(application.candidateProfileId) ?? null,
+      })),
+      total,
+      pagination,
+    );
   },
 
   async findById(id: number, recruiterId: number) {
-    return findOwnedApplication(id, recruiterId);
+    const application = await findOwnedApplication(id, recruiterId);
+    const recruiterProfile = await getRecruiterProfile(recruiterId);
+    const conversation = await prisma.conversation.findFirst({
+      where: {
+        candidateProfileId: application.candidateProfileId,
+        recruiterProfileId: recruiterProfile.id,
+        jobPostingId: application.jobPostingId,
+      },
+      select: { id: true },
+    });
+
+    return { ...application, conversation };
   },
 
   async updateStatus(id: number, recruiterId: number, status: string) {
@@ -151,19 +194,36 @@ export const recruiterApplicationService = {
     return updated;
   },
 
-  async createFeedback(applicationId: number, recruiterId: number, content: string) {
+  async createFeedback(applicationId: number, recruiterId: number, content: string, status?: string) {
     const application = await findOwnedApplication(applicationId, recruiterId);
     const recruiterProfile = await getRecruiterProfile(recruiterId);
 
-    const feedback = await prisma.applicationFeedback.create({
-      data: { applicationId, recruiterProfileId: recruiterProfile.id, content },
+    if (status && status !== application.status) {
+      validateStatusTransition(application.status, status);
+    }
+
+    const feedback = await prisma.$transaction(async (tx) => {
+      const createdFeedback = await tx.applicationFeedback.create({
+        data: { applicationId, recruiterProfileId: recruiterProfile.id, content },
+      });
+
+      if (status && status !== application.status) {
+        await tx.application.update({
+          where: { id: applicationId },
+          data: { status },
+        });
+      }
+
+      return createdFeedback;
     });
 
     await notifyCandidate(
       application.candidateProfile.user.id,
       'feedback_received',
       'Phản hồi ứng tuyển',
-      `Công ty ${recruiterProfile.companyName} đã gửi phản hồi cho đơn ứng tuyển vị trí ${application.jobPosting.title}`,
+      status
+        ? `Công ty ${recruiterProfile.companyName} đã gửi phản hồi và cập nhật kết quả ${statusLabel[status] ?? status} cho vị trí ${application.jobPosting.title}`
+        : `Công ty ${recruiterProfile.companyName} đã gửi phản hồi cho đơn ứng tuyển vị trí ${application.jobPosting.title}`,
       applicationId,
     );
 

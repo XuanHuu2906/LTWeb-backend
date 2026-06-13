@@ -71,10 +71,18 @@ const salaryRangeRefinement = (data: {
   return data.salaryMin <= data.salaryMax;
 };
 
-export const createJobSchema = jobBaseSchema.refine(salaryRangeRefinement, {
-  message: 'salaryMin phải nhỏ hơn hoặc bằng salaryMax',
-  path: ['salaryMin'],
-});
+export const createJobSchema = jobBaseSchema
+  .extend({
+    status: z.enum(['active', 'draft']).optional(),
+  })
+  .refine((data) => data.status === 'draft' || Boolean(data.expiresAt), {
+    message: 'Hạn nộp hồ sơ là bắt buộc khi đăng tin hoạt động',
+    path: ['expiresAt'],
+  })
+  .refine(salaryRangeRefinement, {
+    message: 'salaryMin phải nhỏ hơn hoặc bằng salaryMax',
+    path: ['salaryMin'],
+  });
 
 export const updateJobSchema = jobBaseSchema
   .partial()

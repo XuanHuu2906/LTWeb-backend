@@ -6,6 +6,7 @@ import { AppError } from '../../middleware/errorHandler';
 import { env } from '../../config/env';
 import { UserRole, UserStatus } from '../../types/enums';
 import { parseDuration } from '../../utils/time';
+import { addEmailJob } from '../../utils/email.queue';
 
 export interface RegisterCandidateInput {
   email: string;
@@ -18,6 +19,9 @@ export interface RegisterRecruiterInput {
   password: string;
   companyName: string;
   contactName?: string;
+  phone?: string | null;
+  website?: string | null;
+  description?: string | null;
 }
 
 // Optional: define types if not fully defined in enums, but strings are fine as per Prisma schema.
@@ -33,7 +37,7 @@ export const authService = {
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    const user = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
           email: data.email,
@@ -47,7 +51,7 @@ export const authService = {
       });
 
       // Queue email welcome
-      await tx.emailQueue.create({
+      const email = await tx.emailQueue.create({
         data: {
           userId: newUser.id,
           toEmail: newUser.email,
@@ -56,10 +60,12 @@ export const authService = {
         }
       });
 
-      return newUser;
+      return { user: newUser, emailId: email.id };
     });
 
-    return user;
+    await addEmailJob(result.emailId);
+
+    return result.user;
   },
 
   async registerRecruiter(data: RegisterRecruiterInput) {
@@ -70,7 +76,7 @@ export const authService = {
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
-    const user = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const newUser = await tx.user.create({
         data: {
           email: data.email,
@@ -83,12 +89,15 @@ export const authService = {
         data: {
           userId: newUser.id,
           companyName: data.companyName,
-          contactName: data.contactName
+          contactName: data.contactName,
+          phone: data.phone ?? null,
+          website: data.website ?? null,
+          description: data.description ?? null,
         },
       });
 
       // Queue email welcome
-      await tx.emailQueue.create({
+      const email = await tx.emailQueue.create({
         data: {
           userId: newUser.id,
           toEmail: newUser.email,
@@ -97,10 +106,12 @@ export const authService = {
         }
       });
 
-      return newUser;
+      return { user: newUser, emailId: email.id };
     });
 
-    return user;
+    await addEmailJob(result.emailId);
+
+    return result.user;
   },
 
   async login(email: string, password: string) {
@@ -213,7 +224,7 @@ export const authService = {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    await prisma.$transaction(async (tx) => {
+    const emailId = await prisma.$transaction(async (tx) => {
       await tx.passwordResetToken.create({
         data: {
           userId: user.id,
@@ -223,7 +234,7 @@ export const authService = {
       });
 
       const resetLink = `${env.clientUrl}/reset-password?token=${rawToken}`;
-      await tx.emailQueue.create({
+      const emailQueue = await tx.emailQueue.create({
         data: {
           userId: user.id,
           toEmail: user.email,
@@ -231,7 +242,11 @@ export const authService = {
           bodyHtml: `<p>Bạn đã yêu cầu đặt lại mật khẩu. Vui lòng click vào link bên dưới để đặt lại mật khẩu (có hiệu lực trong 30 phút):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
         }
       });
+
+      return emailQueue.id;
     });
+
+    await addEmailJob(emailId);
   },
 
   async resetPassword(token: string, newPassword: string) {
@@ -526,7 +541,7 @@ export const authService = {
 
       // Đưa tác vụ gửi email vào emailQueue ngoài transaction, an toàn với try-catch
       try {
-        await prisma.emailQueue.create({
+        const email = await prisma.emailQueue.create({
           data: {
             userId,
             toEmail: user.email,
@@ -538,6 +553,7 @@ export const authService = {
               : `<p>Xin chào ${normalizedFullName},</p><p>Hồ sơ nhà tuyển dụng cho ${normalizedCompanyName} đã được tạo thành công.</p>`,
           }
         });
+        await addEmailJob(email.id);
       } catch (err: any) {
         console.warn('[BullMQ] Gửi email chào mừng thất bại, ghi log warning nhưng không rollback onboarding:', err.message);
       }
@@ -556,4 +572,3 @@ export const authService = {
     };
   },
 };
-

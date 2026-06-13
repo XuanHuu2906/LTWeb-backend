@@ -1,8 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import { AppError } from "../../middleware/errorHandler";
 import { candidateProfileService } from "../../services/users/candidate-profile.service";
-import { supabaseStorageService } from "../../services/storage/supabase-storage.service";
-import prisma from "../../config/database";
 
 const getCurrentUserId = (req: Request) => {
   if (!req.user?.id) {
@@ -84,20 +82,14 @@ export const uploadAvatar = async (
       throw new AppError(400, "Vui lòng chọn file avatar");
     }
 
-    const uploadResult = await supabaseStorageService.uploadFile(
-      req.file,
-      "avatars",
-    );
-
-    const profile = await prisma.candidateProfile.update({
-      where: { userId },
-      data: { avatarUrl: uploadResult.publicUrl || null },
-      select: { avatarUrl: true },
-    });
+    const profile = await candidateProfileService.replaceAvatar(userId, req.file);
 
     return res.json({
       success: true,
-      data: { avatarUrl: profile.avatarUrl },
+      data: {
+        avatarUrl: profile.avatarUrl,
+        avatarStoragePath: profile.avatarStoragePath,
+      },
     });
   } catch (error) {
     return next(error);

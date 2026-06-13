@@ -209,7 +209,6 @@ export const candidateApplicationService = {
           },
           orderBy: { createdAt: "desc" },
         },
-        evaluations: true,
       },
     });
 
