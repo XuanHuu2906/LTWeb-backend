@@ -1,5 +1,6 @@
 import { prisma } from "../../utils/prisma";
 import { AppError } from "../../middleware/errorHandler";
+import { JOB_STATUS } from "../../types/enums";
 
 type ApplyInput = {
   jobPostingId: number;
@@ -80,7 +81,7 @@ export const candidateApplicationService = {
     const jobPosting = await prisma.jobPosting.findFirst({
       where: {
         id: data.jobPostingId,
-        status: "active",
+        status: JOB_STATUS.ACTIVE,
         deletedAt: null,
         expiresAt: { gte: new Date() },
       },

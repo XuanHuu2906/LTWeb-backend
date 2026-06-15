@@ -1,6 +1,7 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { PaginationParams } from '../../common/paginate';
+import { JOB_STATUS } from '../../types/enums';
 
 export interface UserFilters {
   role?: string;
@@ -278,7 +279,7 @@ export const userAdminService = {
 
     recentJobs.forEach(job => {
       const name = job.recruiter.recruiterProfile?.companyName || job.recruiter.email;
-      const isPending = job.status === 'pending';
+      const isPending = job.status === JOB_STATUS.PENDING_REVIEW;
       activities.push({
         id: `job-${job.id}`,
         type: isPending ? 'approval' : 'job_posted',
@@ -301,6 +302,8 @@ export const userAdminService = {
       },
       jobsBreakdown: jobsByStatus.reduce((acc: any, curr: any) => {
         acc[curr.status] = curr._count;
+        if (curr.status === JOB_STATUS.ACTIVE) acc.active = (acc.active ?? 0) + curr._count;
+        if (curr.status === JOB_STATUS.PENDING_REVIEW) acc.pending = (acc.pending ?? 0) + curr._count;
         return acc;
       }, {}),
       cvsBreakdown: cvsByType.reduce((acc: any, curr: any) => {
@@ -389,7 +392,7 @@ export const userAdminService = {
 
     recentJobs.forEach(job => {
       const name = job.recruiter.recruiterProfile?.companyName || job.recruiter.email;
-      const isPending = job.status === 'pending';
+      const isPending = job.status === JOB_STATUS.PENDING_REVIEW;
       activities.push({
         id: `job-${job.id}`,
         type: isPending ? 'approval' : 'job_posted',

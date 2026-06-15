@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { JOB_STATUS } from '../../types/enums';
 
 const optionalNumber = z.coerce
   .number()
@@ -73,9 +74,9 @@ const salaryRangeRefinement = (data: {
 
 export const createJobSchema = jobBaseSchema
   .extend({
-    status: z.enum(['active', 'draft']).optional(),
+    status: z.enum(['active', JOB_STATUS.PENDING_REVIEW, JOB_STATUS.DRAFT]).optional(),
   })
-  .refine((data) => data.status === 'draft' || Boolean(data.expiresAt), {
+  .refine((data) => data.status === JOB_STATUS.DRAFT || Boolean(data.expiresAt), {
     message: 'Hạn nộp hồ sơ là bắt buộc khi đăng tin hoạt động',
     path: ['expiresAt'],
   })
@@ -95,5 +96,5 @@ export const updateJobSchema = jobBaseSchema
   });
 
 export const updateJobStatusSchema = z.object({
-  status: z.enum(['active', 'closed']),
+  status: z.enum(['active', JOB_STATUS.PENDING_REVIEW, JOB_STATUS.CLOSED]),
 });

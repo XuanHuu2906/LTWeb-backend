@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { AppError } from "../../middleware/errorHandler";
 import { cache, getOrSetCache } from "../../utils/cache";
+import { JOB_STATUS } from "../../types/enums";
 
 export type JobFilters = {
   location?: string;
@@ -36,7 +37,7 @@ const buildBaseWhere = (filters: JobFilters = {}) => {
   const where: Prisma.JobPostingWhereInput = {};
 
   // Mặc định chỉ lấy job đang active
-  where.status = "active";
+  where.status = JOB_STATUS.ACTIVE;
 
   // Không lấy job đã bị xóa mềm
   where.deletedAt = null;
@@ -150,7 +151,7 @@ export const publicJobService = {
 
     const jobs = await prisma.jobPosting.findMany({
       where: {
-        status: "active",
+        status: JOB_STATUS.ACTIVE,
         deletedAt: null,
         expiresAt: { gte: new Date() },
       },
@@ -290,8 +291,9 @@ export const publicJobService = {
     const job = await prisma.jobPosting.findFirst({
       where: {
         id: id,
-        status: "active",
+        status: JOB_STATUS.ACTIVE,
         deletedAt: null,
+        expiresAt: { gte: new Date() },
       },
 
       // Lấy thêm dữ liệu liên quan để trang chi tiết hiển thị đầy đủ
@@ -351,7 +353,7 @@ export const publicJobService = {
     const job = await prisma.jobPosting.findFirst({
       where: {
         id: jobPostingId,
-        status: "active",
+        status: JOB_STATUS.ACTIVE,
         deletedAt: null,
         expiresAt: {
           gte: new Date(),
@@ -418,6 +420,13 @@ export const publicJobService = {
     // Bước 2: Điều kiện là chỉ lấy savedJob của user hiện tại
     const whereCondition = {
       userId: userId,
+      jobPosting: {
+        status: JOB_STATUS.ACTIVE,
+        deletedAt: null,
+        expiresAt: {
+          gte: new Date(),
+        },
+      },
     };
 
     // Bước 3: Lấy danh sách saved jobs
