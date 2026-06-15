@@ -1,10 +1,11 @@
 import { prisma } from "../../utils/prisma";
+import { JOB_STATUS } from "../../types/enums";
 
 export const homeService = {
   async getHomeContent() {
     const now = new Date();
     const activeJobWhere = {
-      status: "active",
+      status: JOB_STATUS.ACTIVE,
       deletedAt: null,
       OR: [{ expiresAt: null }, { expiresAt: { gte: now } }],
     };

@@ -108,7 +108,9 @@ export const cvService = {
       orderBy: { updatedAt: 'desc' },
     });
 
-    const result = cvs.map(parseCvJsonFields);
+    const result = await Promise.all(
+      cvs.map((cv) => signCvPdfUrl(parseCvJsonFields(cv))),
+    );
     await cache.setJson(cacheKey, result, 300);
     return result;
   },
@@ -143,7 +145,8 @@ export const cvService = {
     });
 
     await invalidateUserCvCache(userId);
-    return parseCvJsonFields(cv);
+    const parsedCv = parseCvJsonFields(cv);
+    return signCvPdfUrl(parsedCv);
   },
 
   async findById(id: number) {
@@ -225,7 +228,8 @@ export const cvService = {
     }
 
     await invalidateUserCvCache(userId);
-    return parseCvJsonFields(cv);
+    const parsedCv = parseCvJsonFields(cv);
+    return signCvPdfUrl(parsedCv);
   },
 
   async updateStatus(id: number, userId: number, status: 'draft' | 'active') {
@@ -249,6 +253,7 @@ export const cvService = {
     });
 
     await invalidateUserCvCache(userId);
-    return parseCvJsonFields(cv);
+    const parsedCv = parseCvJsonFields(cv);
+    return signCvPdfUrl(parsedCv);
   },
 };

@@ -214,7 +214,7 @@ async function createJob(data: {
       salaryUnit: data.salaryUnit ?? "month",
       jobType: data.jobType,
       experienceLevel: data.experienceLevel,
-      status: "active",
+      status: "DANG_HOAT_DONG",
       expiresAt: data.expiresAt,
       skills: {
         create: data.skillIds.map((skillId) => ({

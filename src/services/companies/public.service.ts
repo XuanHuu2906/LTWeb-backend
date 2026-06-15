@@ -1,5 +1,6 @@
 import { prisma } from "../../utils/prisma";
 import { AppError } from "../../middleware/errorHandler";
+import { JOB_STATUS } from "../../types/enums";
 
 type Pagination = {
   page: number;
@@ -40,7 +41,7 @@ export const publicCompanyService = {
 
     const where = {
       recruiterId,
-      status: "active",
+      status: JOB_STATUS.ACTIVE,
       deletedAt: null,
       OR: [{ expiresAt: null }, { expiresAt: { gte: new Date() } }],
     };

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { JOB_STATUS } from '../../types/enums';
 
 type JobInput = {
   title?: string;
@@ -31,6 +32,14 @@ const jobInclude = {
   category: true,
   _count: { select: { applications: true } },
 };
+
+const statusesRequiringExpiry: string[] = [JOB_STATUS.PENDING_REVIEW, JOB_STATUS.ACTIVE];
+const recruiterManagedStatuses: string[] = [
+  JOB_STATUS.DRAFT,
+  JOB_STATUS.PENDING_REVIEW,
+  JOB_STATUS.ACTIVE,
+  JOB_STATUS.CLOSED,
+];
 
 const toDateOrNull = (value?: string | null) => {
   if (!value) return null;
@@ -100,9 +109,9 @@ const toPaginatedResult = <T>(items: T[], total: number, pagination: Pagination)
 
 export const recruiterJobService = {
   async create(recruiterId: number, data: JobInput) {
-    const status = data.status === 'draft' ? 'draft' : 'active';
+    const status = data.status === JOB_STATUS.DRAFT ? JOB_STATUS.DRAFT : JOB_STATUS.PENDING_REVIEW;
     const expiresAt = toDateOrNull(data.expiresAt);
-    if (status === 'active') ensureActiveExpiry(expiresAt);
+    if (status !== JOB_STATUS.DRAFT) ensureActiveExpiry(expiresAt);
 
     const job = await prisma.jobPosting.create({
       data: {
@@ -159,7 +168,7 @@ export const recruiterJobService = {
   },
 
   async findDraftJobs(recruiterId: number, pagination: Pagination) {
-    return this.findMyJobs(recruiterId, pagination, 'draft');
+    return this.findMyJobs(recruiterId, pagination, JOB_STATUS.DRAFT);
   },
 
   async findById(id: number, recruiterId: number) {
@@ -177,7 +186,7 @@ export const recruiterJobService = {
 
   async update(id: number, recruiterId: number, data: JobInput) {
     const existingJob = await ensureOwnJob(id, recruiterId);
-    if (existingJob.status === 'active') {
+    if (statusesRequiringExpiry.includes(existingJob.status)) {
       const nextExpiresAt =
         data.expiresAt !== undefined ? toDateOrNull(data.expiresAt) : existingJob.expiresAt;
       ensureActiveExpiry(nextExpiresAt);
@@ -221,28 +230,42 @@ export const recruiterJobService = {
 
     await prisma.jobPosting.update({
       where: { id },
-      data: { deletedAt: new Date(), status: 'closed' },
+      data: { deletedAt: new Date(), status: JOB_STATUS.CLOSED },
     });
   },
 
   async updateStatus(id: number, recruiterId: number, status: string) {
     const job = await ensureOwnJob(id, recruiterId);
+    const legacySubmitForReview = status === 'active';
+    const nextStatus =
+      legacySubmitForReview || status === JOB_STATUS.PENDING_REVIEW
+        ? JOB_STATUS.PENDING_REVIEW
+        : status === JOB_STATUS.CLOSED
+          ? JOB_STATUS.CLOSED
+          : null;
 
-    if (!['active', 'closed'].includes(status)) {
-      throw new AppError(400, 'Trạng thái chỉ được là active hoặc closed');
+    if (!nextStatus) {
+      throw new AppError(400, 'Trang thai chi duoc la CHO_DUYET hoac closed');
     }
 
-    if (!['draft', 'active', 'closed'].includes(job.status)) {
-      throw new AppError(400, 'Chỉ được chuyển trạng thái giữa draft, active và closed');
+    if (!recruiterManagedStatuses.includes(job.status)) {
+      throw new AppError(400, 'Trang thai tin tuyen dung khong hop le');
     }
 
-    if (status === 'active') {
+    if (legacySubmitForReview && job.status === JOB_STATUS.ACTIVE) {
+      return this.findById(id, recruiterId);
+    }
+
+    if (nextStatus === JOB_STATUS.PENDING_REVIEW) {
+      if (job.status === JOB_STATUS.ACTIVE) {
+        throw new AppError(400, 'Tin da duoc duyet, recruiter khong the chuyen ve cho duyet');
+      }
       ensureActiveExpiry(job.expiresAt);
     }
 
     return prisma.jobPosting.update({
       where: { id },
-      data: { status },
+      data: { status: nextStatus },
       include: jobInclude,
     });
   },
