@@ -60,9 +60,9 @@ const findOwnedApplication = async (applicationId: number, recruiterId: number) 
 
 const validateStatusTransition = (currentStatus: string, nextStatus: string) => {
   const allowed: Record<string, string[]> = {
-    pending: ['reviewing', 'interview', 'accepted', 'rejected'],
-    reviewing: ['interview', 'accepted', 'rejected'],
-    interview: ['accepted', 'rejected'],
+    pending: ['reviewing', 'interview', 'rejected'],
+    reviewing: ['interview', 'rejected'],
+    interview: ['rejected'],
   };
 
   if (!allowed[currentStatus]?.includes(nextStatus)) {
@@ -73,7 +73,6 @@ const validateStatusTransition = (currentStatus: string, nextStatus: string) => 
 const statusLabel: Record<string, string> = {
   reviewing: 'Đang xem xét',
   interview: 'Mời phỏng vấn',
-  accepted: 'Phù hợp',
   rejected: 'Không phù hợp',
 };
 
