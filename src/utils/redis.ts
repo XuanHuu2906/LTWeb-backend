@@ -7,6 +7,7 @@ export const redisConnectionOptions: RedisOptions = {
   password: env.redis.password,
   enableReadyCheck: false,
   maxRetriesPerRequest: null,
+  ...(env.redis.host.includes('upstash.io') || process.env.REDIS_TLS === 'true' ? { tls: {} } : {}),
 };
 
 const redisClientOptions: RedisOptions = {

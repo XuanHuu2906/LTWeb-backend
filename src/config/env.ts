@@ -27,13 +27,8 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
   jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'fallback-refresh-secret',
   jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
-  smtp: {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587', 10),
-    user: process.env.SMTP_USER || '',
-    pass: process.env.SMTP_PASS || '',
-  },
-  smtpFrom: process.env.SMTP_FROM || 'noreply@timviec.vn',
+  emailFrom: process.env.EMAIL_FROM || 'noreply@mail.dreamcoffee.biz',
+  resendApiKey: process.env.RESEND_API_KEY || '',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   redis: {
