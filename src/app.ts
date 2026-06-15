@@ -48,7 +48,19 @@ const globalLimiter = rateLimit({
   },
 });
 
-app.use(cors({ origin: env.corsOrigin, credentials: true }));
+const allowedOrigins = env.corsOrigin.split(',').map(o => o.trim());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Blocked by CORS'));
+      }
+    },
+    credentials: true,
+  }),
+);
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
