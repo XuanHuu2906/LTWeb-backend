@@ -30,7 +30,6 @@ model User {
   jobViews            JobView[]
   jobPostings         JobPosting[]
   notifications       Notification[]
-  emailQueue          EmailQueue[]
   messages            Message[]
   auditLogs           AuditLog[]
 
@@ -360,25 +359,6 @@ model Notification {
   @@index([isRead])
   @@index([type])
   @@map("notifications")
-}
-
-model EmailQueue {
-  id         Int       @id @default(autoincrement())
-  userId     Int?      @map("user_id")
-  toEmail    String    @map("to_email")
-  subject    String
-  bodyHtml   String    @map("body_html")
-  status     String    @default("pending")
-  retryCount Int       @default(0) @map("retry_count") @db.SmallInt
-  sentAt     DateTime? @map("sent_at")
-  errorMsg   String?   @map("error_msg")
-  createdAt  DateTime  @default(now()) @map("created_at")
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([status])
-  @@index([createdAt])
-  @@map("email_queue")
 }
 
 // ── Module 6: Chat ────────────────────────────────────────────────────────

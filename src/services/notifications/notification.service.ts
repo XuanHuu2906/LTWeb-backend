@@ -1,6 +1,5 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
-import { sendEmail } from '../../utils/email';
 
 // ── Find All (paginated) ────────────────────────────────────────────────────
 export const findAll = async (
@@ -68,33 +67,6 @@ export const create = async (
   });
 };
 
-// ── Queue Email ─────────────────────────────────────────────────────────────
-export const queueEmail = async (
-  userId: number | null,
-  toEmail: string,
-  subject: string,
-  bodyHtml: string
-) => {
-  const email = await prisma.emailQueue.create({
-    data: { userId, toEmail, subject, bodyHtml, status: 'pending' },
-  });
-
-  try {
-    await sendEmail(toEmail, subject, bodyHtml);
-    await prisma.emailQueue.update({
-      where: { id: email.id },
-      data: { status: 'sent', sentAt: new Date() },
-    });
-  } catch (err: any) {
-    await prisma.emailQueue.update({
-      where: { id: email.id },
-      data: { status: 'failed', errorMsg: err.message },
-    });
-    console.error('[Email] Gửi thất bại:', err.message);
-  }
-
-  return email;
-};
 
 // ── Create Application Notification ─────────────────────────────────────────
 export const createApplicationNotification = async (

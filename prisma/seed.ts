@@ -27,7 +27,6 @@ async function cleanup() {
   await prisma.jobCategory.deleteMany({});
 
   await prisma.notification.deleteMany({});
-  await prisma.emailQueue.deleteMany({});
 
   await prisma.cV.deleteMany({});
   await prisma.cVTemplate.deleteMany({});

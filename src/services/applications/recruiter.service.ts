@@ -397,6 +397,10 @@ export const recruiterApplicationService = {
         },
       });
 
+      return interview;
+    });
+
+    try {
       const candidateName = application.candidateProfile.fullName || application.candidateProfile.user.email;
       const confirmLink = `${env.clientUrl}/candidate/confirm-interview?applicationId=${applicationId}`;
       const emailHtml = buildInterviewInvitationHtml({
@@ -410,26 +414,14 @@ export const recruiterApplicationService = {
         confirmLink,
       });
 
-      const email = await tx.emailQueue.create({
-        data: {
-          userId: application.candidateProfile.user.id,
-          toEmail: application.candidateProfile.user.email,
-          subject: `Mời phỏng vấn vị trí ${application.jobPosting.title} tại ${recruiterProfile.companyName}`,
-          bodyHtml: emailHtml,
-        },
-      });
-
-      return { interview, emailId: email.id };
-    });
-
-    const emailRecord = await prisma.emailQueue.findUnique({ where: { id: result.emailId } });
-    if (emailRecord) {
-      await sendEmail(emailRecord.toEmail, emailRecord.subject, emailRecord.bodyHtml);
-      await prisma.emailQueue.update({
-        where: { id: result.emailId },
-        data: { status: 'sent', sentAt: new Date() },
-      });
-      console.log('[Email] Đã gửi email mời phỏng vấn đến:', emailRecord.toEmail);
+      await sendEmail(
+        application.candidateProfile.user.email,
+        `Mời phỏng vấn vị trí ${application.jobPosting.title} tại ${recruiterProfile.companyName}`,
+        emailHtml
+      );
+      console.log('[Email] Đã gửi email mời phỏng vấn đến:', application.candidateProfile.user.email);
+    } catch (err: any) {
+      console.error('[Email] Gửi email mời phỏng vấn thất bại:', err.message);
     }
 
     await notifyCandidate(
@@ -440,6 +432,6 @@ export const recruiterApplicationService = {
       applicationId,
     );
 
-    return result.interview;
+    return result;
   },
 };
