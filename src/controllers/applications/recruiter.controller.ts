@@ -40,6 +40,22 @@ const getCurrentUserId = (req: Request) => {
   return req.user.id;
 };
 
+export const getApplications = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const jobId = parseNumberQuery(req.query.jobId);
+    const result = await recruiterApplicationService.findApplications(
+      getCurrentUserId(req),
+      getPagination(req),
+      parseStringQuery(req.query.status),
+      jobId,
+    );
+
+    return res.json({ success: true, data: result.items, meta: result.meta });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const getApplicationsByJob = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const result = await recruiterApplicationService.findByJobId(

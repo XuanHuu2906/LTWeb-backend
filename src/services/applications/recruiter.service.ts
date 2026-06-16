@@ -3,6 +3,7 @@ import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { buildInterviewInvitationHtml, sendEmail } from '../../utils/email';
 import { env } from '../../config/env';
+import { storageService } from '../storage/storage.service';
 
 type Pagination = {
   page: number;
@@ -60,6 +61,15 @@ const findOwnedApplication = async (applicationId: number, recruiterId: number) 
   });
 
   if (!application) throw new AppError(404, 'Đơn ứng tuyển không tồn tại hoặc bạn không có quyền xem');
+
+  if (application.cv && application.cv.pdfStoragePath) {
+    try {
+      application.cv.pdfUrl = await storageService.createSignedUrl(application.cv.pdfStoragePath, 'cvs', 600);
+    } catch (err) {
+      console.error('Lỗi khi tạo Signed URL cho CV ứng tuyển:', err);
+    }
+  }
+
   return application;
 };
 
@@ -102,6 +112,65 @@ const notifyCandidate = async (
 };
 
 export const recruiterApplicationService = {
+  async findApplications(
+    recruiterId: number,
+    pagination: Pagination,
+    statusFilter?: string,
+    jobPostingId?: number,
+  ) {
+    const recruiterProfile = await getRecruiterProfile(recruiterId);
+
+    const where: Prisma.ApplicationWhereInput = {
+      jobPosting: {
+        recruiterId,
+        deletedAt: null,
+      },
+      deletedAt: null,
+    };
+    if (statusFilter) where.status = statusFilter;
+    if (jobPostingId) where.jobPostingId = jobPostingId;
+
+    const [applications, total] = await Promise.all([
+      prisma.application.findMany({
+        where,
+        include: {
+          candidateProfile: {
+            include: { user: { select: { email: true } } },
+          },
+          cv: { select: { title: true, cvType: true, pdfUrl: true, pdfStoragePath: true } },
+          jobPosting: { select: { id: true, title: true, recruiterId: true } },
+          feedbacks: {
+            include: { recruiterProfile: { select: { companyName: true } } },
+            orderBy: { createdAt: 'desc' },
+          },
+          evaluations: true,
+        },
+        orderBy: { appliedAt: 'desc' },
+        skip: pagination.skip,
+        take: pagination.take,
+      }),
+      prisma.application.count({ where }),
+    ]);
+
+    await Promise.all(
+      applications.map(async (application) => {
+        if (application.cv && application.cv.pdfStoragePath) {
+          try {
+            application.cv.pdfUrl = await storageService.createSignedUrl(
+              application.cv.pdfStoragePath,
+              'cvs',
+              600,
+            );
+          } catch (err) {
+            console.error('Lỗi khi tạo Signed URL cho CV ứng tuyển:', err);
+          }
+        }
+      }),
+    );
+
+    return toPaginatedResult(applications, total, pagination);
+  },
+
   async findByJobId(
     jobPostingId: number,
     recruiterId: number,
@@ -124,7 +193,7 @@ export const recruiterApplicationService = {
           candidateProfile: {
             include: { user: { select: { email: true } } },
           },
-          cv: { select: { title: true, cvType: true, pdfUrl: true } },
+          cv: { select: { title: true, cvType: true, pdfUrl: true, pdfStoragePath: true } },
           jobPosting: { select: { id: true, title: true, recruiterId: true } },
           feedbacks: {
             include: { recruiterProfile: { select: { companyName: true } } },
@@ -138,6 +207,22 @@ export const recruiterApplicationService = {
       }),
       prisma.application.count({ where }),
     ]);
+
+    await Promise.all(
+      applications.map(async (application) => {
+        if (application.cv && application.cv.pdfStoragePath) {
+          try {
+            application.cv.pdfUrl = await storageService.createSignedUrl(
+              application.cv.pdfStoragePath,
+              'cvs',
+              600,
+            );
+          } catch (err) {
+            console.error('Lỗi khi tạo Signed URL cho CV ứng tuyển (danh sách):', err);
+          }
+        }
+      })
+    );
 
     const conversations = await prisma.conversation.findMany({
       where: {
