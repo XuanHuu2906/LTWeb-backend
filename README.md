@@ -4,6 +4,46 @@ Dự án Backend cho hệ thống Website Tìm Việc, được xây dựng bằ
 
 ---
 
+## 🐳 Docker
+
+```bash
+cd D:\LTWeb
+
+# Start (lần đầu cần --build, các lần sau bỏ)
+docker compose -f docker-compose.dev.yml up --build
+
+# Start (lần sau, không cần build lại)
+docker compose -f docker-compose.dev.yml up
+
+# Seed data (1 lần duy nhất)
+docker compose -f docker-compose.dev.yml exec backend npx prisma db seed
+
+# Xem logs
+docker compose -f docker-compose.dev.yml logs -f
+
+# Xem trạng thái
+docker compose -f docker-compose.dev.yml ps
+
+# Dừng
+docker compose -f docker-compose.dev.yml stop
+
+# Dừng + xóa
+docker compose -f docker-compose.dev.yml down
+
+# Xóa luôn DB data (reset)
+docker compose -f docker-compose.dev.yml down -v
+
+# Prisma Studio
+docker compose -f docker-compose.dev.yml exec backend npx prisma studio
+
+# Sync schema sau khi sửa schema.prisma
+docker compose -f docker-compose.dev.yml exec backend npx prisma db push
+```
+
+PostgreSQL + Redis chạy local qua container. Backend tại `http://localhost:3000`, Swagger tại `http://localhost:3000/api-docs`. Frontend tại `http://localhost:5173`.
+
+---
+
 ## 🛠 Công nghệ sử dụng
 
 - **Runtime**: [Node.js](https://nodejs.org/) (Khuyến nghị >= 18.x)
