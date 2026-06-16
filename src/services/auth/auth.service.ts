@@ -51,33 +51,20 @@ export const authService = {
         data: { userId: newUser.id, fullName: data.fullName },
       });
 
-      // Queue email welcome
-      const email = await tx.emailQueue.create({
-        data: {
-          userId: newUser.id,
-          toEmail: newUser.email,
-          subject: 'Chào mừng bạn đến với Website Tìm Việc',
-          bodyHtml: `<p>Xin chào ${data.fullName},</p><p>Cảm ơn bạn đã đăng ký tài khoản Candidate!</p>`,
-        }
-      });
-
-      return { user: newUser, emailId: email.id };
+      return newUser;
     });
 
     try {
-      const emailRecord = await prisma.emailQueue.findUnique({ where: { id: result.emailId } });
-      if (emailRecord) {
-        await sendEmail(emailRecord.toEmail, emailRecord.subject, emailRecord.bodyHtml);
-        await prisma.emailQueue.update({
-          where: { id: result.emailId },
-          data: { status: 'sent', sentAt: new Date() },
-        });
-      }
+      await sendEmail(
+        result.email,
+        'Chào mừng bạn đến với Website Tìm Việc',
+        `<p>Xin chào ${data.fullName},</p><p>Cảm ơn bạn đã đăng ký tài khoản Candidate!</p>`
+      );
     } catch (err: any) {
       console.error('[Email] Gửi email chào mừng thất bại:', err.message);
     }
 
-    return result.user;
+    return result;
   },
 
   async registerRecruiter(data: RegisterRecruiterInput) {
@@ -108,28 +95,15 @@ export const authService = {
         },
       });
 
-      // Queue email welcome
-      const email = await tx.emailQueue.create({
-        data: {
-          userId: newUser.id,
-          toEmail: newUser.email,
-          subject: 'Chào mừng nhà tuyển dụng đến với Website Tìm Việc',
-          bodyHtml: `<p>Xin chào ${data.companyName},</p><p>Cảm ơn bạn đã đăng ký tài khoản Recruiter!</p>`,
-        }
-      });
-
-      return { user: newUser, emailId: email.id };
+      return newUser;
     });
 
     try {
-      const emailRecord = await prisma.emailQueue.findUnique({ where: { id: result.emailId } });
-      if (emailRecord) {
-        await sendEmail(emailRecord.toEmail, emailRecord.subject, emailRecord.bodyHtml);
-        await prisma.emailQueue.update({
-          where: { id: result.emailId },
-          data: { status: 'sent', sentAt: new Date() },
-        });
-      }
+      await sendEmail(
+        result.email,
+        'Chào mừng nhà tuyển dụng đến với Website Tìm Việc',
+        `<p>Xin chào ${data.companyName},</p><p>Cảm ơn bạn đã đăng ký tài khoản Recruiter!</p>`
+      );
     } catch (err: any) {
       console.error('[Email] Gửi email chào mừng thất bại:', err.message);
     }
@@ -145,7 +119,7 @@ export const authService = {
       console.error('[Notification] Gửi thông báo admin đăng ký tài khoản doanh nghiệp thất bại:', err.message);
     }
 
-    return result.user;
+    return result;
   },
 
   async login(email: string, password: string) {
@@ -258,7 +232,8 @@ export const authService = {
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    const emailId = await prisma.$transaction(async (tx) => {
+    const resetLink = `${env.clientUrl}/reset-password?token=${rawToken}`;
+    await prisma.$transaction(async (tx) => {
       await tx.passwordResetToken.create({
         data: {
           userId: user.id,
@@ -266,29 +241,14 @@ export const authService = {
           expiresAt: new Date(Date.now() + 30 * 60 * 1000), // 30 phút
         },
       });
-
-      const resetLink = `${env.clientUrl}/reset-password?token=${rawToken}`;
-      const emailQueue = await tx.emailQueue.create({
-        data: {
-          userId: user.id,
-          toEmail: user.email,
-          subject: 'Yêu cầu đặt lại mật khẩu',
-          bodyHtml: `<p>Bạn đã yêu cầu đặt lại mật khẩu. Vui lòng click vào link bên dưới để đặt lại mật khẩu (có hiệu lực trong 30 phút):</p><p><a href="${resetLink}">${resetLink}</a></p>`,
-        }
-      });
-
-      return emailQueue.id;
     });
 
     try {
-      const emailRecord = await prisma.emailQueue.findUnique({ where: { id: emailId } });
-      if (emailRecord) {
-        await sendEmail(emailRecord.toEmail, emailRecord.subject, emailRecord.bodyHtml);
-        await prisma.emailQueue.update({
-          where: { id: emailId },
-          data: { status: 'sent', sentAt: new Date() },
-        });
-      }
+      await sendEmail(
+        user.email,
+        'Yêu cầu đặt lại mật khẩu',
+        `<p>Bạn đã yêu cầu đặt lại mật khẩu. Vui lòng click vào link bên dưới để đặt lại mật khẩu (có hiệu lực trong 30 phút):</p><p><a href="${resetLink}">${resetLink}</a></p>`
+      );
     } catch (err: any) {
       console.error('[Email] Gửi email đặt lại mật khẩu thất bại:', err.message);
     }
@@ -584,25 +544,15 @@ export const authService = {
       );
       authResult.accessToken = realAccessToken;
 
-      // Đưa tác vụ gửi email vào emailQueue ngoài transaction, an toàn với try-catch
       try {
-        const email = await prisma.emailQueue.create({
-          data: {
-            userId,
-            toEmail: user.email,
-            subject: role === 'candidate'
-              ? 'Chào mừng bạn đến với HireArch (Ứng viên)'
-              : 'Chào mừng nhà tuyển dụng đến với HireArch',
-            bodyHtml: role === 'candidate'
-              ? `<p>Xin chào ${normalizedFullName},</p><p>Hồ sơ ứng viên của bạn đã được thiết lập thành công bằng Google.</p>`
-              : `<p>Xin chào ${normalizedFullName},</p><p>Hồ sơ nhà tuyển dụng cho ${normalizedCompanyName} đã được tạo thành công.</p>`,
-          }
-        });
-        await sendEmail(email.toEmail, email.subject, email.bodyHtml);
-        await prisma.emailQueue.update({
-          where: { id: email.id },
-          data: { status: 'sent', sentAt: new Date() },
-        });
+        const subject = role === 'candidate'
+          ? 'Chào mừng bạn đến với HireArch (Ứng viên)'
+          : 'Chào mừng nhà tuyển dụng đến với HireArch';
+        const bodyHtml = role === 'candidate'
+          ? `<p>Xin chào ${normalizedFullName},</p><p>Hồ sơ ứng viên của bạn đã được thiết lập thành công bằng Google.</p>`
+          : `<p>Xin chào ${normalizedFullName},</p><p>Hồ sơ nhà tuyển dụng cho ${normalizedCompanyName} đã được tạo thành công.</p>`;
+
+        await sendEmail(user.email, subject, bodyHtml);
 
         // Notify admins if role is recruiter
         if (role === 'recruiter') {
