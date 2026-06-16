@@ -4,6 +4,7 @@ import {
   createFeedback,
   getApplicationDetail,
   getApplicationsByJob,
+  getApplications,
   scheduleInterview,
   updateApplicationStatus,
   updateEvaluation,
@@ -22,6 +23,7 @@ const router = Router();
 
 router.use(authenticate, authorize('recruiter'));
 
+router.get('/', getApplications);
 router.get('/job/:jobId', getApplicationsByJob);
 router.get('/:id', getApplicationDetail);
 router.put('/:id/status', validate(applicationStatusSchema), updateApplicationStatus);
