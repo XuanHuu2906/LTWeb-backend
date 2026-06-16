@@ -6,7 +6,8 @@ import { AppError } from '../../middleware/errorHandler';
 import { env } from '../../config/env';
 import { UserRole, UserStatus } from '../../types/enums';
 import { parseDuration } from '../../utils/time';
-import { addEmailJob } from '../../utils/email.queue';
+import { sendEmail } from '../../utils/email';
+import { notifyAdmins } from '../notifications/notification.service';
 
 export interface RegisterCandidateInput {
   email: string;
@@ -63,7 +64,18 @@ export const authService = {
       return { user: newUser, emailId: email.id };
     });
 
-    await addEmailJob(result.emailId);
+    try {
+      const emailRecord = await prisma.emailQueue.findUnique({ where: { id: result.emailId } });
+      if (emailRecord) {
+        await sendEmail(emailRecord.toEmail, emailRecord.subject, emailRecord.bodyHtml);
+        await prisma.emailQueue.update({
+          where: { id: result.emailId },
+          data: { status: 'sent', sentAt: new Date() },
+        });
+      }
+    } catch (err: any) {
+      console.error('[Email] Gửi email chào mừng thất bại:', err.message);
+    }
 
     return result.user;
   },
@@ -109,7 +121,29 @@ export const authService = {
       return { user: newUser, emailId: email.id };
     });
 
-    await addEmailJob(result.emailId);
+    try {
+      const emailRecord = await prisma.emailQueue.findUnique({ where: { id: result.emailId } });
+      if (emailRecord) {
+        await sendEmail(emailRecord.toEmail, emailRecord.subject, emailRecord.bodyHtml);
+        await prisma.emailQueue.update({
+          where: { id: result.emailId },
+          data: { status: 'sent', sentAt: new Date() },
+        });
+      }
+    } catch (err: any) {
+      console.error('[Email] Gửi email chào mừng thất bại:', err.message);
+    }
+
+    // Notify admins about new recruiter account
+    try {
+      await notifyAdmins(
+        'new_recruiter_account',
+        'Đăng ký tài khoản Doanh nghiệp mới',
+        `Doanh nghiệp mới ${data.companyName} vừa đăng ký tài khoản trên hệ thống.`
+      );
+    } catch (err: any) {
+      console.error('[Notification] Gửi thông báo admin đăng ký tài khoản doanh nghiệp thất bại:', err.message);
+    }
 
     return result.user;
   },
@@ -246,7 +280,18 @@ export const authService = {
       return emailQueue.id;
     });
 
-    await addEmailJob(emailId);
+    try {
+      const emailRecord = await prisma.emailQueue.findUnique({ where: { id: emailId } });
+      if (emailRecord) {
+        await sendEmail(emailRecord.toEmail, emailRecord.subject, emailRecord.bodyHtml);
+        await prisma.emailQueue.update({
+          where: { id: emailId },
+          data: { status: 'sent', sentAt: new Date() },
+        });
+      }
+    } catch (err: any) {
+      console.error('[Email] Gửi email đặt lại mật khẩu thất bại:', err.message);
+    }
   },
 
   async resetPassword(token: string, newPassword: string) {
@@ -545,7 +590,7 @@ export const authService = {
           data: {
             userId,
             toEmail: user.email,
-            subject: role === 'candidate' 
+            subject: role === 'candidate'
               ? 'Chào mừng bạn đến với HireArch (Ứng viên)'
               : 'Chào mừng nhà tuyển dụng đến với HireArch',
             bodyHtml: role === 'candidate'
@@ -553,9 +598,23 @@ export const authService = {
               : `<p>Xin chào ${normalizedFullName},</p><p>Hồ sơ nhà tuyển dụng cho ${normalizedCompanyName} đã được tạo thành công.</p>`,
           }
         });
-        await addEmailJob(email.id);
+        await sendEmail(email.toEmail, email.subject, email.bodyHtml);
+        await prisma.emailQueue.update({
+          where: { id: email.id },
+          data: { status: 'sent', sentAt: new Date() },
+        });
+
+        // Notify admins if role is recruiter
+        if (role === 'recruiter') {
+          const companyName = normalizedCompanyName || `${normalizedFullName}'s Company`;
+          await notifyAdmins(
+            'new_recruiter_account',
+            'Đăng ký tài khoản Doanh nghiệp mới',
+            `Doanh nghiệp mới ${companyName} vừa đăng ký tài khoản trên hệ thống.`
+          );
+        }
       } catch (err: any) {
-        console.warn('[BullMQ] Gửi email chào mừng thất bại, ghi log warning nhưng không rollback onboarding:', err.message);
+        console.error('[Email/Notification] Gửi thông báo Google onboarding thất bại:', err.message);
       }
     }
 

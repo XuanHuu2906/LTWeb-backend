@@ -1,6 +1,8 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
+import { buildInterviewInvitationHtml, sendEmail } from '../../utils/email';
+import { env } from '../../config/env';
 
 type Pagination = {
   page: number;
@@ -51,6 +53,9 @@ const findOwnedApplication = async (applicationId: number, recruiterId: number) 
         orderBy: { createdAt: 'desc' },
       },
       evaluations: true,
+      interviews: {
+        orderBy: { createdAt: 'desc' },
+      },
     },
   });
 
@@ -62,7 +67,8 @@ const validateStatusTransition = (currentStatus: string, nextStatus: string) => 
   const allowed: Record<string, string[]> = {
     pending: ['reviewing', 'interview', 'rejected'],
     reviewing: ['interview', 'rejected'],
-    interview: ['rejected'],
+    interview: ['confirmed', 'rejected'],
+    confirmed: ['rejected'],
   };
 
   if (!allowed[currentStatus]?.includes(nextStatus)) {
@@ -272,5 +278,83 @@ export const recruiterApplicationService = {
       where: { applicationId },
       data: { score, notes },
     });
+  },
+
+  async scheduleInterview(
+    applicationId: number,
+    recruiterId: number,
+    data: { content: string; scheduledAt: string; type: string; location: string; notes?: string },
+  ) {
+    const application = await findOwnedApplication(applicationId, recruiterId);
+    const recruiterProfile = await getRecruiterProfile(recruiterId);
+
+    const nextStatus = 'interview';
+    validateStatusTransition(application.status, nextStatus);
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.applicationFeedback.create({
+        data: { applicationId, recruiterProfileId: recruiterProfile.id, content: data.content },
+      });
+
+      await tx.application.update({
+        where: { id: applicationId },
+        data: { status: nextStatus },
+      });
+
+      const interview = await tx.interview.create({
+        data: {
+          applicationId,
+          scheduledAt: new Date(data.scheduledAt),
+          type: data.type,
+          location: data.location,
+          notes: data.notes,
+          status: 'scheduled',
+        },
+      });
+
+      const candidateName = application.candidateProfile.fullName || application.candidateProfile.user.email;
+      const confirmLink = `${env.clientUrl}/candidate/confirm-interview?applicationId=${applicationId}`;
+      const emailHtml = buildInterviewInvitationHtml({
+        candidateName,
+        jobTitle: application.jobPosting.title,
+        companyName: recruiterProfile.companyName,
+        scheduledAt: data.scheduledAt,
+        type: data.type,
+        location: data.location,
+        notes: data.notes,
+        confirmLink,
+      });
+
+      const email = await tx.emailQueue.create({
+        data: {
+          userId: application.candidateProfile.user.id,
+          toEmail: application.candidateProfile.user.email,
+          subject: `Mời phỏng vấn vị trí ${application.jobPosting.title} tại ${recruiterProfile.companyName}`,
+          bodyHtml: emailHtml,
+        },
+      });
+
+      return { interview, emailId: email.id };
+    });
+
+    const emailRecord = await prisma.emailQueue.findUnique({ where: { id: result.emailId } });
+    if (emailRecord) {
+      await sendEmail(emailRecord.toEmail, emailRecord.subject, emailRecord.bodyHtml);
+      await prisma.emailQueue.update({
+        where: { id: result.emailId },
+        data: { status: 'sent', sentAt: new Date() },
+      });
+      console.log('[Email] Đã gửi email mời phỏng vấn đến:', emailRecord.toEmail);
+    }
+
+    await notifyCandidate(
+      application.candidateProfile.user.id,
+      'interview_scheduled',
+      'Lịch phỏng vấn mới',
+      `Công ty ${recruiterProfile.companyName} đã mời bạn phỏng vấn cho vị trí ${application.jobPosting.title}. Vui lòng kiểm tra email và xác nhận tham gia.`,
+      applicationId,
+    );
+
+    return result.interview;
   },
 };

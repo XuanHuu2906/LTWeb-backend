@@ -4,6 +4,7 @@ import {
   createFeedback,
   getApplicationDetail,
   getApplicationsByJob,
+  scheduleInterview,
   updateApplicationStatus,
   updateEvaluation,
   updateFeedback,
@@ -14,6 +15,7 @@ import {
   applicationStatusSchema,
   evaluateSchema,
   feedbackSchema,
+  scheduleInterviewSchema,
 } from '../../validations/applications/recruiter.validation';
 
 const router = Router();
@@ -27,5 +29,6 @@ router.post('/:id/feedback', validate(feedbackSchema), createFeedback);
 router.put('/:id/feedback/:feedbackId', validate(feedbackSchema), updateFeedback);
 router.post('/:id/evaluate', validate(evaluateSchema), createEvaluation);
 router.put('/:id/evaluate', validate(evaluateSchema), updateEvaluation);
+router.post('/:id/interview', validate(scheduleInterviewSchema), scheduleInterview);
 
 export default router;

@@ -281,6 +281,7 @@ model Application {
   cv               CV                      @relation(fields: [cvId], references: [id])
   feedbacks        ApplicationFeedback[]
   evaluations      ApplicationEvaluation[]
+  interviews       Interview[]
 
   @@unique([candidateProfileId, jobPostingId])
   @@index([candidateProfileId])
@@ -318,6 +319,26 @@ model ApplicationEvaluation {
   recruiterProfile RecruiterProfile @relation(fields: [recruiterProfileId], references: [id])
 
   @@map("application_evaluations")
+}
+
+model Interview {
+  id            Int       @id @default(autoincrement())
+  applicationId Int       @map("application_id")
+  scheduledAt   DateTime  @map("scheduled_at")
+  type          String    // online | offline
+  location      String?
+  notes         String?
+  status        String    @default("scheduled") // scheduled | confirmed | cancelled | completed
+  confirmedAt   DateTime? @map("confirmed_at")
+  cancelledAt   DateTime? @map("cancelled_at")
+  cancelReason  String?   @map("cancel_reason")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("interviews")
 }
 
 // ── Module 5: Notifications ───────────────────────────────────────────────

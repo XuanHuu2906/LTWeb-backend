@@ -30,7 +30,7 @@ export const env = {
   emailFrom: process.env.EMAIL_FROM || 'noreply@mail.dreamcoffee.biz',
   resendApiKey: process.env.RESEND_API_KEY || '',
   clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
-  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173,http://localhost:3000',
   redis: {
     host: process.env.REDIS_HOST || '127.0.0.1',
     port: parseInt(process.env.REDIS_PORT || '6379', 10),

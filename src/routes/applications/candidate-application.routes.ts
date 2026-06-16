@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   applyJob,
+  confirmInterview,
   getApplicationDetail,
   getMyApplications,
 } from '../../controllers/applications/candidate-application.controller';
@@ -13,5 +14,6 @@ const router = Router();
 router.post('/', authenticate, validate(applySchema), applyJob);
 router.get('/my', authenticate, getMyApplications);
 router.get('/:id', authenticate, getApplicationDetail);
+router.put('/:id/confirm-interview', authenticate, confirmInterview);
 
 export default router;

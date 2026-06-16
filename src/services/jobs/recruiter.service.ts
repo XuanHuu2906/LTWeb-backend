@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
 import { JOB_STATUS } from '../../types/enums';
+import { notifyAdmins } from '../notifications/notification.service';
 
 type JobInput = {
   title?: string;
@@ -139,10 +140,31 @@ export const recruiterJobService = {
       });
     }
 
-    return prisma.jobPosting.findUnique({
+    const createdJob = await prisma.jobPosting.findUnique({
       where: { id: job.id },
       include: jobInclude,
     });
+
+    if (createdJob && createdJob.status === JOB_STATUS.PENDING_REVIEW) {
+      try {
+        const recruiter = await prisma.recruiterProfile.findUnique({
+          where: { userId: recruiterId },
+          select: { companyName: true },
+        });
+        const companyName = recruiter?.companyName || 'Nhà tuyển dụng';
+        await notifyAdmins(
+          'job_pending_review',
+          'Tin tuyển dụng cần phê duyệt',
+          `Nhà tuyển dụng ${companyName} vừa đăng tin tuyển dụng "${createdJob.title}" và đang chờ phê duyệt.`,
+          'job',
+          createdJob.id
+        );
+      } catch (err: any) {
+        console.error('[Notification] Gửi thông báo phê duyệt tin tuyển dụng mới thất bại:', err.message);
+      }
+    }
+
+    return createdJob;
   },
 
   async findMyJobs(recruiterId: number, pagination: Pagination, statusFilter?: string) {
@@ -263,10 +285,31 @@ export const recruiterJobService = {
       ensureActiveExpiry(job.expiresAt);
     }
 
-    return prisma.jobPosting.update({
+    const updatedJob = await prisma.jobPosting.update({
       where: { id },
       data: { status: nextStatus },
       include: jobInclude,
     });
+
+    if (nextStatus === JOB_STATUS.PENDING_REVIEW) {
+      try {
+        const recruiter = await prisma.recruiterProfile.findUnique({
+          where: { userId: recruiterId },
+          select: { companyName: true },
+        });
+        const companyName = recruiter?.companyName || 'Nhà tuyển dụng';
+        await notifyAdmins(
+          'job_pending_review',
+          'Tin tuyển dụng cần phê duyệt',
+          `Nhà tuyển dụng ${companyName} vừa đăng tin tuyển dụng "${updatedJob.title}" và đang chờ phê duyệt.`,
+          'job',
+          updatedJob.id
+        );
+      } catch (err: any) {
+        console.error('[Notification] Gửi thông báo phê duyệt tin tuyển dụng cập nhật thất bại:', err.message);
+      }
+    }
+
+    return updatedJob;
   },
 };

@@ -121,6 +121,19 @@ export const createEvaluation = async (req: Request, res: Response, next: NextFu
   }
 };
 
+export const scheduleInterview = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const interview = await recruiterApplicationService.scheduleInterview(
+      parseId(req.params.id, 'ID đơn ứng tuyển'),
+      getCurrentUserId(req),
+      req.body,
+    );
+    return res.status(201).json({ success: true, data: interview, message: 'Đã gửi thư mời phỏng vấn' });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const updateEvaluation = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const evaluation = await recruiterApplicationService.updateEvaluation(
