@@ -181,6 +181,7 @@ export const candidateApplicationService = {
           },
           cv: { select: { title: true, cvType: true } },
           feedbacks: { take: 1, orderBy: { createdAt: "desc" } },
+          interviews: { orderBy: { createdAt: "desc" } },
         },
         orderBy: { appliedAt: "desc" },
         skip,
@@ -210,6 +211,9 @@ export const candidateApplicationService = {
           },
           orderBy: { createdAt: "desc" },
         },
+        interviews: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
 
@@ -230,5 +234,47 @@ export const candidateApplicationService = {
         },
       ],
     };
+  },
+
+  async confirmInterview(applicationId: number, userId: number) {
+    const candidateProfile = await getCandidateProfile(userId);
+
+    const application = await prisma.application.findFirst({
+      where: { id: applicationId, candidateProfileId: candidateProfile.id, deletedAt: null },
+      include: {
+        interviews: { orderBy: { createdAt: "desc" }, take: 1 },
+        jobPosting: { select: { title: true } },
+      },
+    });
+
+    if (!application) {
+      throw new AppError(404, "Đơn ứng tuyển không tồn tại");
+    }
+
+    if (application.status !== "interview") {
+      throw new AppError(400, "Đơn ứng tuyển chưa được mời phỏng vấn");
+    }
+
+    const interview = application.interviews[0];
+    if (!interview) {
+      throw new AppError(404, "Không tìm thấy lịch phỏng vấn");
+    }
+
+    if (interview.status !== "scheduled") {
+      throw new AppError(400, "Lịch phỏng vấn này đã được xử lý");
+    }
+
+    const [updatedInterview] = await prisma.$transaction([
+      prisma.interview.update({
+        where: { id: interview.id },
+        data: { status: "confirmed", confirmedAt: new Date() },
+      }),
+      prisma.application.update({
+        where: { id: applicationId },
+        data: { status: "confirmed" },
+      }),
+    ]);
+
+    return updatedInterview;
   },
 };

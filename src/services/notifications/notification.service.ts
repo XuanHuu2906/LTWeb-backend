@@ -1,6 +1,6 @@
 import { prisma } from '../../utils/prisma';
 import { AppError } from '../../middleware/errorHandler';
-import { addEmailJob } from '../../utils/email.queue';
+import { sendEmail } from '../../utils/email';
 
 // ── Find All (paginated) ────────────────────────────────────────────────────
 export const findAll = async (
@@ -78,7 +78,20 @@ export const queueEmail = async (
   const email = await prisma.emailQueue.create({
     data: { userId, toEmail, subject, bodyHtml, status: 'pending' },
   });
-  await addEmailJob(email.id);
+
+  try {
+    await sendEmail(toEmail, subject, bodyHtml);
+    await prisma.emailQueue.update({
+      where: { id: email.id },
+      data: { status: 'sent', sentAt: new Date() },
+    });
+  } catch (err: any) {
+    await prisma.emailQueue.update({
+      where: { id: email.id },
+      data: { status: 'failed', errorMsg: err.message },
+    });
+    console.error('[Email] Gửi thất bại:', err.message);
+  }
 
   return email;
 };
@@ -113,3 +126,34 @@ export const createFeedbackNotification = async (
     'application'
   );
 };
+
+export const notifyAdmins = async (
+  type: string,
+  title: string,
+  message: string,
+  relatedType?: string,
+  relatedId?: number
+) => {
+  const admins = await prisma.user.findMany({
+    where: { role: 'admin', deletedAt: null },
+    select: { id: true },
+  });
+
+  if (admins.length === 0) return;
+
+  await Promise.all(
+    admins.map((admin) =>
+      prisma.notification.create({
+        data: {
+          userId: admin.id,
+          type,
+          title,
+          message,
+          relatedType,
+          relatedId,
+        },
+      })
+    )
+  );
+};
+

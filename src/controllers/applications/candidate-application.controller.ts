@@ -84,6 +84,18 @@ export const getMyApplications = async (
   }
 };
 
+export const confirmInterview = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const interview = await candidateApplicationService.confirmInterview(
+      parseId(req.params.id),
+      getCurrentUserId(req),
+    );
+    return res.json({ success: true, data: interview, message: 'Xác nhận phỏng vấn thành công' });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const getApplicationDetail = async (
   req: Request,
   res: Response,
