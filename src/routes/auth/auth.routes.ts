@@ -4,6 +4,7 @@ import { authController } from '../../controllers/auth/auth.controller';
 import { validate } from '../../middleware/validate';
 import { authenticate } from '../../middleware/auth';
 import { createRedisRateLimitStore } from '../../utils/redis-rate-limit-store';
+import { env } from '../../config/env';
 import {
   registerCandidateSchema,
   registerRecruiterSchema,
@@ -18,10 +19,10 @@ import {
 
 const router = Router();
 
-// Bộ giới hạn tần suất truy cập nghiêm ngặt cho đăng nhập/đăng ký (tối đa 5 lần / 15 phút)
+// Bộ giới hạn tần suất truy cập nghiêm ngặt cho đăng nhập/đăng ký (tối đa 5 lần / 15 phút, dev nới lên 50)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 phút
-  max: 5,
+  max: env.nodeEnv === 'development' ? 50 : 5,
   store: createRedisRateLimitStore('rate-limit:auth'),
   passOnStoreError: true,
   standardHeaders: true,
