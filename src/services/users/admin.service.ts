@@ -18,7 +18,7 @@ export interface UserUpdateInput {
 export const userAdminService = {
   async findAll(filters: UserFilters, pagination: PaginationParams) {
     const where: any = { role: { not: 'admin' }, deletedAt: null };
-    
+
     if (filters.role) where.role = filters.role;
     if (filters.status) where.status = filters.status;
     if (filters.search) {
@@ -119,6 +119,7 @@ export const userAdminService = {
     });
   },
 
+  // Chỉnh sửa trạng thái hoạt động tài khoản
   async toggleStatus(id: number, status: string, adminId: number) {
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) throw new AppError(404, 'Không tìm thấy người dùng');
@@ -154,15 +155,63 @@ export const userAdminService = {
   },
 
   async softDelete(id: number, adminId: number) {
-    const user = await prisma.user.findUnique({ where: { id } });
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: { candidateProfile: true, recruiterProfile: true },
+    });
     if (!user) throw new AppError(404, 'Không tìm thấy người dùng');
     if (user.role === 'admin') throw new AppError(403, 'Không thể xóa admin');
+    if (user.deletedAt) throw new AppError(400, 'Tài khoản đã bị xóa trước đó');
+
+    const timestamp = Date.now();
+    const anonymizedEmail = `deleted_${id}_${timestamp}@anon.local`;
+    // Hash không hợp lệ để chặn mọi nỗ lực đăng nhập
+    const invalidatedPasswordHash = `__ANONYMIZED__${timestamp}`;
 
     await prisma.$transaction(async (tx) => {
+      // Ẩn danh thông tin định danh trong bảng users + giải phóng email gốc
       await tx.user.update({
         where: { id },
-        data: { deletedAt: new Date() },
+        data: {
+          email: anonymizedEmail,
+          passwordHash: invalidatedPasswordHash,
+          status: 'banned',
+          deletedAt: new Date(timestamp),
+        },
       });
+
+      // Ẩn danh hồ sơ ứng viên nếu có
+      if (user.candidateProfile) {
+        await tx.candidateProfile.update({
+          where: { userId: id },
+          data: {
+            fullName: 'Người dùng đã xóa',
+            phone: null,
+            address: null,
+            dateOfBirth: null,
+            avatarUrl: null,
+            avatarStoragePath: null,
+            bio: null,
+          },
+        });
+      }
+
+      // Ẩn danh hồ sơ nhà tuyển dụng nếu có
+      if (user.recruiterProfile) {
+        await tx.recruiterProfile.update({
+          where: { userId: id },
+          data: {
+            companyName: 'Doanh nghiệp đã xóa',
+            contactName: null,
+            phone: null,
+            address: null,
+            website: null,
+            description: null,
+            logoUrl: null,
+            logoStoragePath: null,
+          },
+        });
+      }
 
       // Ghi log kiểm toán
       await tx.auditLog.create({
@@ -192,13 +241,13 @@ export const userAdminService = {
       prisma.cV.count({ where: { deletedAt: null } }),
       prisma.user.count({ where: { role: 'candidate', deletedAt: null } }),
       prisma.user.count({ where: { role: 'recruiter', deletedAt: null } }),
-      
+
       prisma.jobPosting.groupBy({
         by: ['status'],
         _count: true,
         where: { deletedAt: null },
       }),
-      
+
       prisma.cV.groupBy({
         by: ['cvType'],
         _count: true,
