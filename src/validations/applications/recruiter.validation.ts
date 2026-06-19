@@ -21,7 +21,7 @@ import { z } from 'zod';
  * (các trạng thái khác do candidate hoặc hệ thống xử lý)
  */
 export const applicationStatusSchema = z.object({
-  status: z.enum(['reviewing', 'interview', 'rejected']),
+  status: z.enum(['reviewing', 'interview', 'hired', 'rejected']),
 });
 
 // --- Schema tạo phản hồi cho ứng viên ---
@@ -32,15 +32,8 @@ export const applicationStatusSchema = z.object({
  *   Nếu có status, backend sẽ tự động chuyển trạng thái đơn
  */
 export const feedbackSchema = z.object({
-  // Nội dung phản hồi - bắt buộc, trim, 1-5000 ký tự
-  content: z
-    .string({ message: 'là bắt buộc' })
-    .trim()
-    .min(1, 'không được bỏ trống')
-    .max(5000, 'không được vượt quá 5000 ký tự'),
-
-  // Trạng thái kèm theo phản hồi (không bắt buộc)
-  status: z.enum(['interview', 'rejected']).optional(),
+  content: z.string({ message: 'là bắt buộc' }).trim().min(1, 'không được bỏ trống').max(5000, 'không được vượt quá 5000 ký tự'),
+  status: z.enum(['interview', 'hired', 'rejected']).optional(),
 });
 
 // --- Schema gửi lịch phỏng vấn ---
