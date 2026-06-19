@@ -2,10 +2,7 @@ import { NextFunction, Request, Response } from "express";
 import { AppError } from "../../middleware/errorHandler";
 import { homeService } from "../../services/home/home.service";
 
-const parsePositiveInt = (
-  value: unknown,
-  fallback: number,
-) => {
+const parsePositiveInt = (value: unknown, fallback: number) => {
   if (typeof value !== "string") return fallback;
 
   const parsed = Number(value);

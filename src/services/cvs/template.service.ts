@@ -4,7 +4,8 @@ import { deleteCacheByPattern, getOrSetCache } from "../../utils/cache";
 
 const TEMPLATE_CACHE_PATTERN = "cv-templates:*";
 
-const invalidateTemplateCache = () => deleteCacheByPattern(TEMPLATE_CACHE_PATTERN);
+const invalidateTemplateCache = () =>
+  deleteCacheByPattern(TEMPLATE_CACHE_PATTERN);
 
 export const findAll = async (isActiveOnly = true) => {
   const cacheKey = isActiveOnly ? "cv-templates:active" : "cv-templates:all";
@@ -59,7 +60,10 @@ export const update = async (
   if (data.layoutConfig !== undefined)
     updateData.layoutConfig = data.layoutConfig;
 
-  const updatedTemplate = await prisma.cVTemplate.update({ where: { id }, data: updateData });
+  const updatedTemplate = await prisma.cVTemplate.update({
+    where: { id },
+    data: updateData,
+  });
   await invalidateTemplateCache();
   return updatedTemplate;
 };

@@ -1,5 +1,5 @@
-import { Request, Response, NextFunction } from 'express';
-import multer from 'multer';
+import { Request, Response, NextFunction } from "express";
+import multer from "multer";
 
 export class AppError extends Error {
   statusCode: number;
@@ -10,7 +10,12 @@ export class AppError extends Error {
   }
 }
 
-export const errorHandler = (err: Error, _req: Request, res: Response, _next: NextFunction) => {
+export const errorHandler = (
+  err: Error,
+  _req: Request,
+  res: Response,
+  _next: NextFunction,
+) => {
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
       success: false,
@@ -20,8 +25,8 @@ export const errorHandler = (err: Error, _req: Request, res: Response, _next: Ne
 
   if (err instanceof multer.MulterError) {
     const message =
-      err.code === 'LIMIT_FILE_SIZE'
-        ? 'File upload vượt quá dung lượng cho phép'
+      err.code === "LIMIT_FILE_SIZE"
+        ? "File upload vượt quá dung lượng cho phép"
         : err.message;
 
     return res.status(400).json({
@@ -30,16 +35,16 @@ export const errorHandler = (err: Error, _req: Request, res: Response, _next: Ne
     });
   }
 
-  if (err.message.includes('Định dạng file không hợp lệ')) {
+  if (err.message.includes("Định dạng file không hợp lệ")) {
     return res.status(400).json({
       success: false,
       message: err.message,
     });
   }
 
-  console.error('Unhandled error:', err);
+  console.error("Unhandled error:", err);
   return res.status(500).json({
     success: false,
-    message: 'Internal server error',
+    message: "Internal server error",
   });
 };
