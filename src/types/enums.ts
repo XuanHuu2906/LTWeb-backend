@@ -17,7 +17,7 @@ export type ExperienceLevel = 'no_exp' | 'junior' | 'mid' | 'senior' | 'manager'
 export type CVStatus = 'draft' | 'active';
 export type CVType = 'built' | 'uploaded';
 
-export type ApplicationStatus = 'pending' | 'reviewing' | 'interview' | 'rejected' | 'cancelled';
+export type ApplicationStatus = 'pending' | 'reviewing' | 'interview' | 'confirmed' | 'hired' | 'rejected' | 'cancelled';
 
 export type NotificationType =
   | 'application_submitted'

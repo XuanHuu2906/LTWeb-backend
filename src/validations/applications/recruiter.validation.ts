@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
 export const applicationStatusSchema = z.object({
-  status: z.enum(['reviewing', 'interview', 'rejected']),
+  status: z.enum(['reviewing', 'interview', 'hired', 'rejected']),
 });
 
 export const feedbackSchema = z.object({
   content: z.string({ message: 'là bắt buộc' }).trim().min(1, 'không được bỏ trống').max(5000, 'không được vượt quá 5000 ký tự'),
-  status: z.enum(['interview', 'rejected']).optional(),
+  status: z.enum(['interview', 'hired', 'rejected']).optional(),
 });
 
 export const scheduleInterviewSchema = z.object({

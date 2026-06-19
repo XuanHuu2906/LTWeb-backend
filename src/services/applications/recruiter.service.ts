@@ -78,7 +78,7 @@ const validateStatusTransition = (currentStatus: string, nextStatus: string) => 
     pending: ['reviewing', 'interview', 'rejected'],
     reviewing: ['interview', 'rejected'],
     interview: ['confirmed', 'rejected'],
-    confirmed: ['rejected'],
+    confirmed: ['hired', 'rejected'],
   };
 
   if (!allowed[currentStatus]?.includes(nextStatus)) {
@@ -89,6 +89,7 @@ const validateStatusTransition = (currentStatus: string, nextStatus: string) => 
 const statusLabel: Record<string, string> = {
   reviewing: 'Đang xem xét',
   interview: 'Mời phỏng vấn',
+  hired: 'Trúng tuyển',
   rejected: 'Không phù hợp',
 };
 
