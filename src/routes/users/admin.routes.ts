@@ -15,6 +15,8 @@ router.get('/dashboard/stats', userAdminController.getDashboardStats);
 
 router.get('/dashboard/activities', userAdminController.getSystemActivities);
 
+router.get('/dashboard/audit-logs', userAdminController.getAuditLogs);
+
 router.get('/:id', userAdminController.getUserById);
 
 router.put('/:id', validate(adminUpdateUserSchema), userAdminController.updateUser);
