@@ -363,25 +363,159 @@ export const userAdminService = {
     };
   },
 
-  async getSystemActivities(limit = 50) {
-    const [
-      recentUsers,
-      recentCvs,
-      recentJobs,
-    ] = await Promise.all([
+  async getSystemActivities(params: {
+    page: number;
+    limit: number;
+    type?: string;
+    search?: string;
+    date?: string;
+  }) {
+    const { page, limit, type, search, date } = params;
+    const skip = (page - 1) * limit;
+
+    const dateRange = buildDateRange(date);
+    const userSearch = buildUserSearch(search);
+
+    // type cụ thể → query 1 bảng với LIMIT/OFFSET thật sự ở DB
+    if (type && type !== 'all') {
+      if (type === 'registration' || type === 'recruiter_reg') {
+        const role = type === 'registration' ? 'candidate' : 'recruiter';
+        const where: any = { deletedAt: null, role };
+        if (dateRange) where.createdAt = dateRange;
+        if (userSearch) where.OR = userSearch;
+
+        const [total, rows] = await Promise.all([
+          prisma.user.count({ where }),
+          prisma.user.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
+            include: {
+              candidateProfile: { select: { fullName: true } },
+              recruiterProfile: { select: { companyName: true } },
+            },
+          }),
+        ]);
+        return { items: rows.map(mapUserToActivity), total, page, limit };
+      }
+
+      if (type === 'cv_created') {
+        const where: any = { deletedAt: null };
+        if (dateRange) where.createdAt = dateRange;
+        if (search) {
+          where.user = {
+            OR: [
+              { email: { contains: search, mode: 'insensitive' } },
+              { candidateProfile: { fullName: { contains: search, mode: 'insensitive' } } },
+            ],
+          };
+        }
+
+        const [total, rows] = await Promise.all([
+          prisma.cV.count({ where }),
+          prisma.cV.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
+            select: {
+              id: true,
+              title: true,
+              cvType: true,
+              createdAt: true,
+              user: {
+                select: {
+                  email: true,
+                  candidateProfile: { select: { fullName: true } },
+                },
+              },
+            },
+          }),
+        ]);
+        return { items: rows.map(mapCvToActivity), total, page, limit };
+      }
+
+      if (type === 'approval' || type === 'job_posted') {
+        const where: any = {
+          deletedAt: null,
+          status: type === 'approval' ? JOB_STATUS.PENDING_REVIEW : { not: JOB_STATUS.PENDING_REVIEW },
+        };
+        if (dateRange) where.createdAt = dateRange;
+        if (search) {
+          where.recruiter = {
+            OR: [
+              { email: { contains: search, mode: 'insensitive' } },
+              { recruiterProfile: { companyName: { contains: search, mode: 'insensitive' } } },
+            ],
+          };
+        }
+
+        const [total, rows] = await Promise.all([
+          prisma.jobPosting.count({ where }),
+          prisma.jobPosting.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
+            include: {
+              recruiter: {
+                select: {
+                  email: true,
+                  recruiterProfile: { select: { companyName: true } },
+                },
+              },
+            },
+          }),
+        ]);
+        return { items: rows.map(mapJobToActivity), total, page, limit };
+      }
+    }
+
+    // type=all → fetch buffer từ mỗi bảng, merge in-memory, sort, slice.
+    // BUFFER đủ lớn cho admin browsing recent activity; trade-off: page cao có thể không có data.
+    const BUFFER = 500;
+
+    const userWhere: any = { deletedAt: null, role: { in: ['candidate', 'recruiter'] } };
+    if (dateRange) userWhere.createdAt = dateRange;
+    if (userSearch) userWhere.OR = userSearch;
+
+    const cvWhere: any = { deletedAt: null };
+    if (dateRange) cvWhere.createdAt = dateRange;
+    if (search) {
+      cvWhere.user = {
+        OR: [
+          { email: { contains: search, mode: 'insensitive' } },
+          { candidateProfile: { fullName: { contains: search, mode: 'insensitive' } } },
+        ],
+      };
+    }
+
+    const jobWhere: any = { deletedAt: null };
+    if (dateRange) jobWhere.createdAt = dateRange;
+    if (search) {
+      jobWhere.recruiter = {
+        OR: [
+          { email: { contains: search, mode: 'insensitive' } },
+          { recruiterProfile: { companyName: { contains: search, mode: 'insensitive' } } },
+        ],
+      };
+    }
+
+    const [users, cvs, jobs] = await Promise.all([
       prisma.user.findMany({
-        where: { deletedAt: null, role: { in: ['candidate', 'recruiter'] } },
+        where: userWhere,
         orderBy: { createdAt: 'desc' },
-        take: limit,
+        take: BUFFER,
         include: {
           candidateProfile: { select: { fullName: true } },
           recruiterProfile: { select: { companyName: true } },
         },
       }),
       prisma.cV.findMany({
-        where: { deletedAt: null },
+        where: cvWhere,
         orderBy: { createdAt: 'desc' },
-        take: limit,
+        take: BUFFER,
         select: {
           id: true,
           title: true,
@@ -396,9 +530,9 @@ export const userAdminService = {
         },
       }),
       prisma.jobPosting.findMany({
-        where: { deletedAt: null },
+        where: jobWhere,
         orderBy: { createdAt: 'desc' },
-        take: limit,
+        take: BUFFER,
         include: {
           recruiter: {
             select: {
@@ -410,51 +544,130 @@ export const userAdminService = {
       }),
     ]);
 
-    const activities: any[] = [];
+    const merged = [
+      ...users.map(mapUserToActivity),
+      ...cvs.map(mapCvToActivity),
+      ...jobs.map(mapJobToActivity),
+    ];
+    merged.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-    recentUsers.forEach(u => {
-      const isCandidate = u.role === 'candidate';
-      const name = isCandidate ? (u.candidateProfile?.fullName || u.email) : (u.recruiterProfile?.companyName || u.email);
-      activities.push({
-        id: `user-${u.id}`,
-        type: isCandidate ? 'registration' : 'recruiter_reg',
-        user: isCandidate ? `Ứng viên ${name}` : `Doanh nghiệp ${name}`,
-        message: isCandidate ? 'đã đăng ký tài khoản ứng viên mới thành công' : 'đăng ký tài khoản doanh nghiệp mới thành công',
-        createdAt: u.createdAt,
-        badgeText: isCandidate ? 'Thành viên mới' : 'Doanh nghiệp mới',
-        badgeColor: isCandidate ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-blue-50 text-blue-700 border-blue-100',
-      });
-    });
+    return {
+      items: merged.slice(skip, skip + limit),
+      total: merged.length,
+      page,
+      limit,
+    };
+  },
 
-    recentCvs.forEach(cv => {
-      const name = cv.user.candidateProfile?.fullName || cv.user.email;
-      activities.push({
-        id: `cv-${cv.id}`,
-        type: 'cv_created',
-        user: `Ứng viên ${name}`,
-        message: cv.cvType === 'uploaded' ? `đã tải lên CV "${cv.title}"` : `đã khởi tạo CV "${cv.title}"`,
-        createdAt: cv.createdAt,
-        badgeText: 'Tạo CV',
-        badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-100',
-      });
-    });
+  async getAuditLogs(params: {
+    page: number;
+    limit: number;
+    action?: string;
+    targetType?: string;
+    search?: string;
+    date?: string;
+  }) {
+    const { page, limit, action, targetType, search, date } = params;
+    const skip = (page - 1) * limit;
 
-    recentJobs.forEach(job => {
-      const name = job.recruiter.recruiterProfile?.companyName || job.recruiter.email;
-      const isPending = job.status === JOB_STATUS.PENDING_REVIEW;
-      activities.push({
-        id: `job-${job.id}`,
-        type: isPending ? 'approval' : 'job_posted',
-        user: isPending ? `Nhà tuyển dụng ${name}` : `Doanh nghiệp ${name}`,
-        message: isPending ? `yêu cầu phê duyệt tin tuyển dụng "${job.title}"` : `đăng tin tuyển dụng mới "${job.title}" thành công`,
-        createdAt: job.createdAt,
-        badgeText: isPending ? 'Chờ duyệt' : 'Tin mới',
-        badgeColor: isPending ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-green-50 text-green-700 border-green-100',
-      });
-    });
+    const where: any = {};
+    if (action) where.action = action;
+    if (targetType) where.targetType = targetType;
 
-    activities.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const dateRange = buildDateRange(date);
+    if (dateRange) where.createdAt = dateRange;
 
-    return activities.slice(0, limit);
+    if (search) {
+      where.admin = {
+        email: { contains: search, mode: 'insensitive' },
+      };
+    }
+
+    const [total, logs] = await Promise.all([
+      prisma.auditLog.count({ where }),
+      prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          admin: { select: { id: true, email: true } },
+        },
+      }),
+    ]);
+
+    return { items: logs, total, page, limit };
   },
 };
+
+// ---------- Helpers ----------
+
+function buildDateRange(date?: string): { gte: Date; lte: Date } | null {
+  if (!date) return null;
+  const start = new Date(`${date}T00:00:00.000Z`);
+  const end = new Date(`${date}T23:59:59.999Z`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  return { gte: start, lte: end };
+}
+
+function buildUserSearch(search?: string) {
+  if (!search) return null;
+  return [
+    { email: { contains: search, mode: 'insensitive' as const } },
+    { candidateProfile: { fullName: { contains: search, mode: 'insensitive' as const } } },
+    { recruiterProfile: { companyName: { contains: search, mode: 'insensitive' as const } } },
+  ];
+}
+
+function mapUserToActivity(u: any) {
+  const isCandidate = u.role === 'candidate';
+  const name = isCandidate
+    ? (u.candidateProfile?.fullName || u.email)
+    : (u.recruiterProfile?.companyName || u.email);
+  return {
+    id: `user-${u.id}`,
+    type: isCandidate ? 'registration' : 'recruiter_reg',
+    user: isCandidate ? `Ứng viên ${name}` : `Doanh nghiệp ${name}`,
+    message: isCandidate
+      ? 'đã đăng ký tài khoản ứng viên mới thành công'
+      : 'đăng ký tài khoản doanh nghiệp mới thành công',
+    createdAt: u.createdAt,
+    badgeText: isCandidate ? 'Thành viên mới' : 'Doanh nghiệp mới',
+    badgeColor: isCandidate
+      ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
+      : 'bg-blue-50 text-blue-700 border-blue-100',
+  };
+}
+
+function mapCvToActivity(cv: any) {
+  const name = cv.user.candidateProfile?.fullName || cv.user.email;
+  return {
+    id: `cv-${cv.id}`,
+    type: 'cv_created',
+    user: `Ứng viên ${name}`,
+    message: cv.cvType === 'uploaded'
+      ? `đã tải lên CV "${cv.title}"`
+      : `đã khởi tạo CV "${cv.title}"`,
+    createdAt: cv.createdAt,
+    badgeText: 'Tạo CV',
+    badgeColor: 'bg-indigo-50 text-indigo-700 border-indigo-100',
+  };
+}
+
+function mapJobToActivity(job: any) {
+  const name = job.recruiter.recruiterProfile?.companyName || job.recruiter.email;
+  const isPending = job.status === JOB_STATUS.PENDING_REVIEW;
+  return {
+    id: `job-${job.id}`,
+    type: isPending ? 'approval' : 'job_posted',
+    user: isPending ? `Nhà tuyển dụng ${name}` : `Doanh nghiệp ${name}`,
+    message: isPending
+      ? `yêu cầu phê duyệt tin tuyển dụng "${job.title}"`
+      : `đăng tin tuyển dụng mới "${job.title}" thành công`,
+    createdAt: job.createdAt,
+    badgeText: isPending ? 'Chờ duyệt' : 'Tin mới',
+    badgeColor: isPending
+      ? 'bg-amber-50 text-amber-700 border-amber-100'
+      : 'bg-green-50 text-green-700 border-green-100',
+  };
+}

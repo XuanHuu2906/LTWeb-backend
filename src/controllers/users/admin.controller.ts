@@ -61,9 +61,42 @@ export const getDashboardStats = async (req: Request, res: Response) => {
 };
 
 export const getSystemActivities = async (req: Request, res: Response) => {
-  const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
-  const activities = await userAdminService.getSystemActivities(limit);
-  res.json(successResponse(activities, 'Lấy nhật ký hệ thống thành công'));
+  const pagination = getPagination(req.query as any);
+  const result = await userAdminService.getSystemActivities({
+    page: pagination.page,
+    limit: pagination.limit,
+    type: (req.query.type as string) || undefined,
+    search: (req.query.search as string) || undefined,
+    date: (req.query.date as string) || undefined,
+  });
+
+  res.json(
+    paginatedResponse(result.items, {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+    })
+  );
+};
+
+export const getAuditLogs = async (req: Request, res: Response) => {
+  const pagination = getPagination(req.query as any);
+  const result = await userAdminService.getAuditLogs({
+    page: pagination.page,
+    limit: pagination.limit,
+    action: (req.query.action as string) || undefined,
+    targetType: (req.query.targetType as string) || undefined,
+    search: (req.query.search as string) || undefined,
+    date: (req.query.date as string) || undefined,
+  });
+
+  res.json(
+    paginatedResponse(result.items, {
+      page: result.page,
+      limit: result.limit,
+      total: result.total,
+    })
+  );
 };
 
 export const userAdminController = {
@@ -74,4 +107,5 @@ export const userAdminController = {
   deleteUser,
   getDashboardStats,
   getSystemActivities,
+  getAuditLogs,
 };

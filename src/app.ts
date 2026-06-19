@@ -3,10 +3,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
-import rateLimit from 'express-rate-limit';
 import { env } from './config/env';
+import { corsOptions } from './config/cors';
 import { errorHandler } from './middleware/errorHandler';
-import { createRedisRateLimitStore } from './utils/redis-rate-limit-store';
+import { globalLimiter } from './middleware/rateLimiter';
 import authRoutes from './routes/auth/auth.routes';
 
 import userAdminRoutes from './routes/users/admin.routes';
@@ -35,32 +35,7 @@ const app = express();
 
 setupSwagger(app as any);
 
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 phút
-  max: 100, // Tối đa 100 requests từ mỗi IP
-  store: createRedisRateLimitStore('rate-limit:global'),
-  passOnStoreError: true,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: 'Quá nhiều yêu cầu từ IP này, vui lòng thử lại sau 15 phút',
-  },
-});
-
-const allowedOrigins = env.corsOrigin.split(',').map(o => o.trim());
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
-        callback(null, true);
-      } else {
-        callback(new Error('Blocked by CORS'));
-      }
-    },
-    credentials: true,
-  }),
-);
+app.use(cors(corsOptions));
 app.use(
   helmet({
     crossOriginResourcePolicy: false,
