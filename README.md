@@ -6,6 +6,17 @@ Dự án Backend cho hệ thống Website Tìm Việc, được xây dựng bằ
 
 ## 🐳 Docker
 
+Compose file đặt ở `D:\LTWeb` (cấp cha). Có 2 mode: **dev** (DB + Redis local) và **prod** (Supabase + Upstash cloud).
+
+### Development — PostgreSQL + Redis chạy container local
+
+Backend dev đọc env từ **`LTWeb-backend/.env.docker`** (không phải `.env`) — file này trỏ tới hostname `postgres` và `redis` trong network compose. Nếu chưa có, copy mẫu rồi điều chỉnh:
+
+```bash
+cd D:\LTWeb\LTWeb-backend
+cp .env.docker .env.docker  # đảm bảo tồn tại; chỉnh JWT_SECRET, RESEND_API_KEY... nếu cần
+```
+
 ```bash
 cd D:\LTWeb
 
@@ -19,7 +30,7 @@ docker compose -f docker-compose.dev.yml up
 docker compose -f docker-compose.dev.yml exec backend npx prisma db seed
 
 # Xem logs
-docker compose -f docker-compose.dev.yml logs -f
+docker compose -f docker-compose.dev.yml logs -f backend
 
 # Xem trạng thái
 docker compose -f docker-compose.dev.yml ps
@@ -27,20 +38,54 @@ docker compose -f docker-compose.dev.yml ps
 # Dừng
 docker compose -f docker-compose.dev.yml stop
 
-# Dừng + xóa
+# Dừng + xóa container
 docker compose -f docker-compose.dev.yml down
 
-# Xóa luôn DB data (reset)
+# Xóa luôn DB data (reset volume postgres + uploads)
 docker compose -f docker-compose.dev.yml down -v
 
-# Prisma Studio
+# Prisma Studio (http://localhost:5555)
 docker compose -f docker-compose.dev.yml exec backend npx prisma studio
 
 # Sync schema sau khi sửa schema.prisma
 docker compose -f docker-compose.dev.yml exec backend npx prisma db push
 ```
 
-PostgreSQL + Redis chạy local qua container. Backend tại `http://localhost:3000`, Swagger tại `http://localhost:3000/api-docs`. Frontend tại `http://localhost:5173`.
+Backend tại `http://localhost:3000`, Swagger tại `http://localhost:3000/api-docs`. Frontend tại `http://localhost:5173`.
+Entrypoint dev tự chạy `prisma db push` rồi `npm run dev` (hot reload).
+
+### Production — kết nối Supabase + Upstash cloud
+
+Backend prod đọc env từ **`LTWeb-backend/.env`** (đang trỏ Supabase pooler + Upstash). Trước khi chạy, kiểm tra `JWT_SECRET`, `JWT_REFRESH_SECRET` đã đổi khác mặc định.
+
+```bash
+cd D:\LTWeb
+
+# Build image production và chạy
+docker compose up --build -d
+
+# Logs
+docker compose logs -f backend
+
+# Dừng
+docker compose down
+```
+
+- Backend prod → `http://localhost:3000` (chỉ truy cập qua frontend nginx proxy `/api`).
+- Entrypoint prod tự chạy `prisma migrate deploy` rồi `node dist/server.js`.
+- Healthcheck `GET /api/health` mỗi 30s; frontend đợi backend `healthy` mới start.
+
+### So sánh nhanh
+
+| | Dev compose | Prod compose |
+|---|---|---|
+| File | `docker-compose.dev.yml` | `docker-compose.yml` |
+| Backend env_file | `.env.docker` | `.env` |
+| Database | Postgres container local | Supabase cloud pooler |
+| Redis | Redis container local | Upstash cloud |
+| Backend stage | `dev` (ts-node-dev) | `production` (node dist) |
+| Frontend | Vite dev server `:5173` | Nginx `:80` proxy `/api` |
+| Prisma | `db push` mỗi start | `migrate deploy` mỗi start |
 
 ---
 
