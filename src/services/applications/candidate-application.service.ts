@@ -1,6 +1,7 @@
 import { prisma } from "../../utils/prisma";
 import { AppError } from "../../middleware/errorHandler";
 import { JOB_STATUS } from "../../types/enums";
+import { invalidateFeaturedJobsCache } from "../jobs/public.service";
 
 type ApplyInput = {
   jobPostingId: number;
@@ -128,6 +129,8 @@ export const candidateApplicationService = {
       application.id,
       application.jobPosting.title,
     );
+
+    await invalidateFeaturedJobsCache();
 
     const recruiterProfileId = jobPosting.recruiter.recruiterProfile?.id;
     if (recruiterProfileId) {

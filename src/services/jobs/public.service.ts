@@ -143,6 +143,10 @@ const invalidateSavedJobsCache = async (userId: number) => {
   await cache.delByPattern(`candidate:${userId}:saved-jobs:*`);
 };
 
+export const invalidateFeaturedJobsCache = async () => {
+  await cache.delByPattern("jobs:featured:*");
+};
+
 export const publicJobService = {
   async findFeatured(limit = 6) {
     const cacheKey = stableCacheKey("jobs:featured", { limit });
@@ -155,8 +159,22 @@ export const publicJobService = {
         deletedAt: null,
         expiresAt: { gte: new Date() },
       },
-      include: jobListInclude,
-      orderBy: { createdAt: "desc" },
+      include: {
+        ...jobListInclude,
+        _count: {
+          select: {
+            applications: true,
+            savedJobs: true,
+            jobViews: true,
+          },
+        },
+      },
+      orderBy: [
+        { applications: { _count: "desc" } },
+        { savedJobs: { _count: "desc" } },
+        { jobViews: { _count: "desc" } },
+        { createdAt: "desc" },
+      ],
       take: limit,
     });
 
@@ -390,6 +408,7 @@ export const publicJobService = {
     });
 
     await invalidateSavedJobsCache(userId);
+    await invalidateFeaturedJobsCache();
     return savedJob;
   },
 
@@ -402,6 +421,7 @@ export const publicJobService = {
     });
 
     await invalidateSavedJobsCache(userId);
+    await invalidateFeaturedJobsCache();
   },
 
   // Lấy danh sách việc làm user đã lưu
