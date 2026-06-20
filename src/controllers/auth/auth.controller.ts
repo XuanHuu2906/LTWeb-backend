@@ -46,6 +46,20 @@ export const resetPassword = async (req: Request, res: Response) => {
   res.json(messageResponse('Mật khẩu đã được đặt lại thành công'));
 };
 
+export const verifyEmail = async (req: Request, res: Response) => {
+  const { token } = req.body;
+  const result = await authService.verifyEmail(token);
+  res.json(successResponse(result, result.alreadyVerified
+    ? 'Tài khoản đã được xác nhận trước đó.'
+    : 'Xác nhận email thành công. Bạn có thể đăng nhập ngay bây giờ.'));
+};
+
+export const resendVerificationEmail = async (req: Request, res: Response) => {
+  const { email } = req.body;
+  await authService.resendVerificationEmail(email);
+  res.json(messageResponse('Nếu email tồn tại và chưa được xác nhận, bạn sẽ nhận được email xác nhận mới.'));
+};
+
 export const getMe = async (req: Request, res: Response) => {
   const userId = req.user?.id;
   if (!userId) throw new AppError(401, 'Unauthorized');
@@ -86,6 +100,8 @@ export const authController = {
   refreshToken,
   forgotPassword,
   resetPassword,
+  verifyEmail,
+  resendVerificationEmail,
   getMe,
   changePassword,
   googleLogin,

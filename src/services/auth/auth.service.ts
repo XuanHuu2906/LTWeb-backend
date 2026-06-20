@@ -6,8 +6,30 @@ import { AppError } from '../../middleware/errorHandler';
 import { env } from '../../config/env';
 import { UserRole, UserStatus } from '../../types/enums';
 import { parseDuration } from '../../utils/time';
-import { sendEmail } from '../../utils/email';
+import { sendEmail, sendVerificationEmail } from '../../utils/email';
 import { notifyAdmins } from '../notifications/notification.service';
+
+const EMAIL_VERIFICATION_TTL_MS = 60 * 60 * 1000; // 1 giờ
+
+async function createAndSendEmailVerification(userId: number, email: string, name: string) {
+  const rawToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+  await prisma.emailVerificationToken.create({
+    data: {
+      userId,
+      token: hashedToken,
+      expiresAt: new Date(Date.now() + EMAIL_VERIFICATION_TTL_MS),
+    },
+  });
+
+  const verifyLink = `${env.clientUrl}/verify-email?token=${rawToken}`;
+  try {
+    await sendVerificationEmail(email, name, verifyLink);
+  } catch (err: any) {
+    console.error('[Email] Gửi email xác nhận thất bại:', err.message);
+  }
+}
 
 export interface RegisterCandidateInput {
   email: string;
@@ -44,7 +66,7 @@ export const authService = {
           email: data.email,
           passwordHash: hashedPassword,
           role: 'candidate',
-          status: 'active',
+          status: 'pending',
         },
       });
       await tx.candidateProfile.create({
@@ -54,15 +76,7 @@ export const authService = {
       return newUser;
     });
 
-    try {
-      await sendEmail(
-        result.email,
-        'Chào mừng bạn đến với Website Tìm Việc',
-        `<p>Xin chào ${data.fullName},</p><p>Cảm ơn bạn đã đăng ký tài khoản Candidate!</p>`
-      );
-    } catch (err: any) {
-      console.error('[Email] Gửi email chào mừng thất bại:', err.message);
-    }
+    await createAndSendEmailVerification(result.id, result.email, data.fullName);
 
     return result;
   },
@@ -81,7 +95,7 @@ export const authService = {
           email: data.email,
           passwordHash: hashedPassword,
           role: 'recruiter',
-          status: 'active',
+          status: 'pending',
         },
       });
       await tx.recruiterProfile.create({
@@ -98,28 +112,89 @@ export const authService = {
       return newUser;
     });
 
-    try {
-      await sendEmail(
-        result.email,
-        'Chào mừng nhà tuyển dụng đến với Website Tìm Việc',
-        `<p>Xin chào ${data.companyName},</p><p>Cảm ơn bạn đã đăng ký tài khoản Recruiter!</p>`
-      );
-    } catch (err: any) {
-      console.error('[Email] Gửi email chào mừng thất bại:', err.message);
-    }
-
-    // Notify admins about new recruiter account
-    try {
-      await notifyAdmins(
-        'new_recruiter_account',
-        'Đăng ký tài khoản Doanh nghiệp mới',
-        `Doanh nghiệp mới ${data.companyName} vừa đăng ký tài khoản trên hệ thống.`
-      );
-    } catch (err: any) {
-      console.error('[Notification] Gửi thông báo admin đăng ký tài khoản doanh nghiệp thất bại:', err.message);
-    }
+    await createAndSendEmailVerification(result.id, result.email, data.companyName);
 
     return result;
+  },
+
+  async verifyEmail(rawToken: string) {
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const verifyToken = await prisma.emailVerificationToken.findUnique({
+      where: { token: hashedToken },
+      include: { user: { include: { recruiterProfile: true } } },
+    });
+
+    if (!verifyToken || verifyToken.usedAt || verifyToken.expiresAt < new Date()) {
+      throw new AppError(400, 'Liên kết xác nhận không hợp lệ hoặc đã hết hạn');
+    }
+
+    const user = verifyToken.user;
+    if (!user || user.deletedAt) {
+      throw new AppError(400, 'Tài khoản không còn tồn tại');
+    }
+
+    if (user.status === 'active') {
+      await prisma.emailVerificationToken.update({
+        where: { id: verifyToken.id },
+        data: { usedAt: new Date() },
+      });
+      return { alreadyVerified: true, role: user.role };
+    }
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { status: 'active' },
+      }),
+      prisma.emailVerificationToken.update({
+        where: { id: verifyToken.id },
+        data: { usedAt: new Date() },
+      }),
+      // Vô hiệu hoá toàn bộ token verification chưa dùng khác của user này
+      prisma.emailVerificationToken.updateMany({
+        where: { userId: user.id, usedAt: null, id: { not: verifyToken.id } },
+        data: { usedAt: new Date() },
+      }),
+    ]);
+
+    // Notify admins khi nhà tuyển dụng xác nhận email xong
+    if (user.role === 'recruiter' && user.recruiterProfile) {
+      try {
+        await notifyAdmins(
+          'new_recruiter_account',
+          'Đăng ký tài khoản Doanh nghiệp mới',
+          `Doanh nghiệp mới ${user.recruiterProfile.companyName} vừa xác nhận email và kích hoạt tài khoản.`
+        );
+      } catch (err: any) {
+        console.error('[Notification] Gửi thông báo admin thất bại:', err.message);
+      }
+    }
+
+    return { alreadyVerified: false, role: user.role };
+  },
+
+  async resendVerificationEmail(email: string) {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { candidateProfile: true, recruiterProfile: true },
+    });
+
+    // Trả về im lặng để không lộ thông tin email tồn tại
+    if (!user || user.deletedAt) return;
+    if (user.status !== 'pending') return; // Đã active hoặc bị ban thì không gửi
+    if (user.role !== 'candidate' && user.role !== 'recruiter') return;
+
+    // Vô hiệu hoá các token chưa dùng cũ
+    await prisma.emailVerificationToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+
+    const name = user.role === 'candidate'
+      ? (user.candidateProfile?.fullName || user.email)
+      : (user.recruiterProfile?.companyName || user.email);
+
+    await createAndSendEmailVerification(user.id, user.email, name);
   },
 
   async login(email: string, password: string) {
@@ -136,6 +211,14 @@ export const authService = {
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw new AppError(401, 'Email hoặc mật khẩu không đúng');
+
+    if (user.status === 'pending') {
+      throw new AppError(
+        403,
+        'Tài khoản chưa được xác nhận. Vui lòng kiểm tra email để hoàn tất xác nhận.',
+        'EMAIL_NOT_VERIFIED'
+      );
+    }
 
     const accessToken = jwt.sign(
       { id: user.id, email: user.email, role: user.role },
@@ -402,6 +485,16 @@ export const authService = {
     // 4. Nếu tài khoản bị khóa
     if (user.deletedAt) throw new AppError(401, 'Tài khoản không tồn tại');
     if (user.status === 'banned') throw new AppError(403, 'Tài khoản đã bị khóa');
+
+    // Google đã xác minh email, kích hoạt tài khoản nếu trước đó đăng ký bằng email và chưa verify
+    if (user.status === 'pending') {
+      await prisma.user.update({ where: { id: user.id }, data: { status: 'active' } });
+      user.status = 'active';
+      await prisma.emailVerificationToken.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+    }
 
     // 5. Sinh access token và refresh token
     const accessToken = jwt.sign(

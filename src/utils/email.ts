@@ -33,6 +33,23 @@ export const sendWelcomeEmail = (to: string, name: string, role: string) =>
     `<p>Chào ${escapeHtml(name)}, cảm ơn bạn đã đăng ký tài khoản ${escapeHtml(role)}.</p>`,
   );
 
+export const sendVerificationEmail = (to: string, name: string, verifyLink: string) =>
+  sendEmail(
+    to,
+    'Xác nhận địa chỉ email - HireArch',
+    `<div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#1e293b;line-height:1.6">
+      <h2 style="color:#0f172a;border-bottom:2px solid #f1f5f9;padding-bottom:12px;margin-bottom:20px">Xác nhận địa chỉ email</h2>
+      <p>Xin chào <strong>${escapeHtml(name)}</strong>,</p>
+      <p>Cảm ơn bạn đã đăng ký tài khoản tại HireArch. Vui lòng nhấn nút bên dưới để xác nhận địa chỉ email và kích hoạt tài khoản:</p>
+      <div style="margin:32px 0;text-align:center">
+        <a href="${escapeHtml(verifyLink)}" style="background-color:#0f172a;color:#ffffff;padding:14px 32px;text-decoration:none;border-radius:6px;font-weight:bold;display:inline-block">Xác nhận email</a>
+      </div>
+      <p style="font-size:13px;color:#64748b">Hoặc sao chép liên kết sau và dán vào trình duyệt:<br/><a href="${escapeHtml(verifyLink)}" style="color:#4f46e5;word-break:break-all">${escapeHtml(verifyLink)}</a></p>
+      <p style="font-size:13px;color:#64748b">Liên kết này sẽ hết hạn sau <strong>1 giờ</strong>. Nếu bạn không yêu cầu đăng ký tài khoản, vui lòng bỏ qua email này.</p>
+      <p style="margin-top:24px;border-top:1px solid #f1f5f9;padding-top:16px">Trân trọng,<br/><strong>Đội ngũ HireArch</strong></p>
+    </div>`,
+  );
+
 export const buildInterviewInvitationHtml = (data: {
   candidateName: string;
   jobTitle: string;
