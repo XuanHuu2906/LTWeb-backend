@@ -59,6 +59,14 @@ export const refreshTokenSchema = z.object({
   refreshToken: z.string({ message: 'là bắt buộc' }).min(1, 'là bắt buộc'),
 });
 
+export const verifyEmailSchema = z.object({
+  token: z.string({ message: 'là bắt buộc' }).min(1, 'là bắt buộc'),
+});
+
+export const resendVerificationSchema = z.object({
+  email: z.string({ message: 'là bắt buộc' }).email('phải là email hợp lệ'),
+});
+
 export const googleLoginSchema = z.object({
   supabaseAccessToken: z.string({ message: 'Supabase Access Token là bắt buộc' }).min(1, 'Supabase Access Token không được để trống'),
 });

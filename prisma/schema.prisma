@@ -20,10 +20,11 @@ model User {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  candidateProfile    CandidateProfile?
-  recruiterProfile    RecruiterProfile?
-  passwordResetTokens PasswordResetToken[]
-  refreshTokens       RefreshToken[]
+  candidateProfile         CandidateProfile?
+  recruiterProfile         RecruiterProfile?
+  passwordResetTokens      PasswordResetToken[]
+  refreshTokens            RefreshToken[]
+  emailVerificationTokens  EmailVerificationToken[]
   cvTemplatesCreated  CVTemplate[]
   cvs                 CV[]
   savedJobs           SavedJob[]
@@ -91,6 +92,21 @@ model PasswordResetToken {
   @@index([token])
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  token     String    @unique
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("email_verification_tokens")
 }
 
 model RefreshToken {

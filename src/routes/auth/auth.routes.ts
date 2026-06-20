@@ -15,6 +15,8 @@ import {
   changePasswordSchema,
   googleLoginSchema,
   completeOnboardingSchema,
+  verifyEmailSchema,
+  resendVerificationSchema,
 } from '../../validations/auth/auth.validation';
 
 const router = Router();
@@ -120,6 +122,29 @@ router.post('/refresh-token', validate(refreshTokenSchema), authController.refre
 router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), authController.forgotPassword);
 
 router.post('/reset-password', validate(resetPasswordSchema), authController.resetPassword);
+
+// Email verification
+router.post('/verify-email', validate(verifyEmailSchema), authController.verifyEmail);
+
+// Resend email verification - rate limit chặt để tránh spam
+const resendVerificationLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 phút
+  max: env.nodeEnv === 'development' ? 20 : 3,
+  store: createRedisRateLimitStore('rate-limit:resend-verify'),
+  passOnStoreError: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Bạn đã yêu cầu gửi lại email xác nhận quá nhiều lần. Vui lòng thử lại sau 1 phút.',
+  },
+});
+router.post(
+  '/resend-verification',
+  resendVerificationLimiter,
+  validate(resendVerificationSchema),
+  authController.resendVerificationEmail
+);
 
 // Protected routes (require authentication)
 router.post('/complete-onboarding', authenticate, validate(completeOnboardingSchema), authController.completeOnboarding);
